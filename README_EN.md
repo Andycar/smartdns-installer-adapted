@@ -24,6 +24,7 @@ A unified transactional Bash installer for deploying a resilient **SmartDNS (DoH
 6. [CLI Command Reference](#6-cli-command-reference)
 7. [Client Device Configuration](#7-client-device-configuration)
 8. [Security, Backups, and Diagnostics](#8-security-backups-and-diagnostics)
+9. [Troubleshooting](#9-troubleshooting)
 
 ---
 
