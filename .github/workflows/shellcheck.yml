@@ -16,13 +16,13 @@ jobs:
 
       - name: Check Linux LF line endings
         run: |
-          if grep -q $'\r' unified-smartdns-installer.sh; then
-            echo "ERROR: CRLF line endings detected in unified-smartdns-installer.sh"
+          if grep -q $'\r' smartdns-installer-v2.10.0-stealth.sh; then
+            echo "ERROR: CRLF line endings detected in smartdns-installer-v2.10.0-stealth.sh"
             exit 1
           fi
 
       - name: Run Bash syntax check (bash -n)
-        run: bash -n unified-smartdns-installer.sh
+        run: bash -n smartdns-installer-v2.10.0-stealth.sh
 
       - name: Run ShellCheck static analysis
-        run: shellcheck -S warning -e SC2034,SC2154 unified-smartdns-installer.sh
+        run: shellcheck -S warning -e SC2034,SC2154 smartdns-installer-v2.10.0-stealth.sh
