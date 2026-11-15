@@ -212,17 +212,31 @@ Upon completing `--install`, the script outputs and stores three personal connec
 * **Web-Auth URL:** `https://<ROOT_DOMAIN>/auth/<DOH_PATH>`
 * **DoT Hostname (`853/TCP`):** `<DOT_HOST>`
 
-### Connection Steps
+### 7.1. Connection Steps
+
 1. **Authorize your client IP address (when using a dynamic IP or when DoT whitelist is enabled):**
    * **DoH clients** authorize automatically on their first DNS query.
    * **DoT clients** should open `https://<ROOT_DOMAIN>/auth/<DOH_PATH>` in a browser on the device or local network (or, if `DOT_WHITELIST_ENABLED` is disabled, the first DoT query with the valid `DOT_HOST` SNI authorizes the IP automatically).
 2. **Configure DNS on your device:**
    * **Android (9+):** *Settings → Network & internet → Private DNS* → select *Private DNS provider hostname* and enter `<DOT_HOST>`.
    * **iOS / macOS:** Install an Apple Configuration Profile (`.mobileconfig`) configured for DNS-over-HTTPS `https://<ROOT_DOMAIN>/resolve/<DOH_PATH>` or DNS-over-TLS `<DOT_HOST>`.
-   * **Windows 11:** *Settings → Network & internet → Ethernet / Wi-Fi → DNS server assignment (Manual)* → enter your server's IPv4 address, set **DNS over HTTPS** to **On (manual template)**, and enter `https://<ROOT_DOMAIN>/resolve/<DOH_PATH>`.
+   * **Windows 11:** *Settings → Network & internet → Ethernet / Wi-Fi → DNS server assignment (Manual)* → enter your server\x27s IPv4 address, set **DNS over HTTPS** to **On (manual template)**, and enter `https://<ROOT_DOMAIN>/resolve/<DOH_PATH>`.
    * **Web Browsers (Chrome / Edge / Firefox):** In Privacy & Security settings, enable *Use Secure DNS* with a custom provider template set to `https://<ROOT_DOMAIN>/resolve/<DOH_PATH>`.
    * **Routers (OpenWrt / Keenetic):** Configure `https-dns-proxy` (DoH) or `stubby` / built-in DoT client pointing to `<DOT_HOST>:853`, ensuring ISP peer DNS is disabled (`peerdns = 0`).
 
+### 7.2. Android Authorization Workflow in DoT Whitelist
+
+The built-in **Private DNS** client in Android (9 and later) relies exclusively on **DNS-over-TLS (`853/TCP`)** and accepts only a hostname (`<DOT_HOST>`). Unlike DNS-over-HTTPS (`/resolve/<DOH_PATH>`), the DoT protocol and Android\x27s system settings provide no mechanism to pass a 48-character secret URI path.
+
+**Architectural Reasons Behind Out-of-Band Authorization:**
+* **Protection against active scanning and DoT subdomain discovery:** During a TLS 1.2/1.3 handshake on port `853/TCP`, the **SNI** extension (`<DOT_HOST>`) is transmitted in plaintext, and subdomains can also be enumerated via Certificate Transparency logs.
+* **Preventing unauthorized resolver abuse:** When `DOT_WHITELIST_ENABLED` is active, `iptables`/`ipset` drops all packets to `853/TCP` from unauthenticated IP addresses prior to the TLS handshake. Because Android\x27s native DoT client cannot present a secret token in a URL path, client authentication is decoupled into the HTTPS channel (`443/TCP`) via the secret `/auth/<DOH_PATH>` endpoint.
+
+**Recommended Workflow on Android Devices (especially on cellular networks with dynamic IPs):**
+1. Bookmark your personal authorization URL (or pin it as a home-screen shortcut) in your mobile browser:
+   `https://<ROOT_DOMAIN>/auth/<DOH_PATH>`
+2. Whenever you join a new Wi-Fi network or your mobile carrier assigns a new IP address, open this bookmark—Nginx validates the secret path and registers your current external IPv4/IPv6 in `ipset` for **24 hours** (`86400s`).
+3. Once the authorization confirmation appears, enable **Private DNS** (`<DOT_HOST>`) in Android settings (if it was temporarily turned off to load the page).
 ---
 
 ## 8. Security, Backups, and Diagnostics
