@@ -293,6 +293,6 @@ curl -sS -o /dev/null -w "HTTP Status: %{http_code}\n" \
 
 * **A-record rewrite and IPv6 (`AAAA`) suppression:** Query a proxied domain directly against your DoH/DoT endpoint (for example, using `kdig` or `doggo`):
   ```bash
-  kdig @<server_ip> +tls-host=<DOT_HOST> chatgpt.com A chatgpt.com AAAA
+  doggo chatgpt.com A chatgpt.com AAAA "@tls://<server_ip>:853" --tls-hostname="<DOT_HOST>"
   ```
   * **Expected result:** The `ANSWER` section returns `<server_ip>` for `A` and an empty `NOERROR` response for `AAAA`. If the client receives a real IPv6 address, browsers will bypass your proxy over IPv6—disable IPv6 on the client network adapter or ensure no secondary ISP DNS server is configured on the device.
