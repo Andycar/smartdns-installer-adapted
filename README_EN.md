@@ -1,5 +1,7 @@
 # Unified SmartDNS + Transparent SNI Proxy Installer (`v2.10.0-stealth`)
 
+[![Donate — CloudTips / SBP](https://img.shields.io/badge/Donate-CloudTips_%2F_SBP-0066FF?style=for-the-badge)](https://pay.cloudtips.ru/p/9785e813)
+
 **Language:** [Русский](README.md) | **English**
 
 [![Version](https://img.shields.io/badge/version-v2.10.0--stealth-blue.svg)](https://github.com/EvgenyElizarenko/smartdns-installer/releases/tag/v2.10.0-stealth)
