@@ -1,31 +1,30 @@
-# Secrets and credentials
-.env
-.env.*
-*.pem
-*.key
-*.p12
-*.pfx
+# ==============================================================================
+# Защита секретов и локальных файлов развёртывания
+# ==============================================================================
 secrets.env
-credentials.*
+settings
+versions.env
+geohide-stats.env
+cover-site.sha256
+latest_backup
+latest_cover_backup
 
-# Local configuration
-config.local.*
-*.local
+# Экспортированные профили и отчёты с чувствительными данными
+*.mobileconfig
+smartdns-installation-report-*.txt
+credentials-*.txt
 
-# Logs
-*.log
-logs/
-
-# Backups
+# Резервные копии и временные каталоги
 backups/
-*.backup
+cover-migration-backup-*/
+fw-backup/
 *.bak
-
-# Temporary files
+*.orig
 *.tmp
-*.swp
-*~
+*.new
 
-# Windows
+# Системные журналы и файлы ОС
+*.log
+.DS_Store
 Thumbs.db
-Desktop.ini
+.local-backups/
