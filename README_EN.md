@@ -392,3 +392,13 @@ curl -sS -o /dev/null -w "HTTP Status: %{http_code}\n" \
   doggo chatgpt.com A chatgpt.com AAAA "@tls://<server_ip>:853" --tls-hostname="<DOT_HOST>"
   ```
   * **Expected result:** The `ANSWER` section returns `<server_ip>` for `A` and an empty `NOERROR` response for `AAAA`. If the client receives a real IPv6 address, browsers will bypass your proxy over IPv6—disable IPv6 on the client network adapter or ensure no secondary ISP DNS server is configured on the device.
+
+---
+
+## Support the Project
+
+If you find this installer useful, you can support its ongoing development:
+
+* **SBP (Fast Payment System) & Bank Cards:** [Donate via CloudTips / SBP](https://pay.cloudtips.ru/p/9785e813)
+
+[![Donate — CloudTips / SBP](https://img.shields.io/badge/Donate-CloudTips_%2F_SBP-0066FF?style=for-the-badge)](https://pay.cloudtips.ru/p/9785e813)
