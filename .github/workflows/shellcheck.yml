@@ -1,0 +1,28 @@
+name: Bash Syntax & ShellCheck
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  lint:
+    name: Validate Bash Script
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Linux LF line endings
+        run: |
+          if grep -q $'\r' unified-smartdns-installer.sh; then
+            echo "ERROR: CRLF line endings detected in unified-smartdns-installer.sh"
+            exit 1
+          fi
+
+      - name: Run Bash syntax check (bash -n)
+        run: bash -n unified-smartdns-installer.sh
+
+      - name: Run ShellCheck static analysis
+        run: shellcheck -S warning -e SC2034,SC2154 unified-smartdns-installer.sh
