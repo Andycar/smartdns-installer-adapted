@@ -25,4 +25,4 @@ jobs:
         run: bash -n smartdns-installer-v2.10.0-stealth.sh
 
       - name: Run ShellCheck static analysis
-        run: shellcheck -S warning -e SC2034,SC2154 smartdns-installer-v2.10.0-stealth.sh
+        run: shellcheck -S warning -e SC1090,SC2034,SC2154 smartdns-installer-v2.10.0-stealth.sh

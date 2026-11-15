@@ -32,8 +32,10 @@ readonly XRAY_ROUTING_JSON="${XRAY_RULES_DIR}/10-smartdns-routing.json"
 readonly LOG_DIR="/var/log/oxidns-installer"
 readonly CERT_DIR="/etc/ssl/smartdns"
 readonly WEB_ROOT="/var/www/studio-nord"
-readonly LAUNCH_DIR="$(pwd)"
-readonly TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+LAUNCH_DIR="$(pwd)"
+readonly LAUNCH_DIR
+TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+readonly TIMESTAMP
 
 readonly OXIDNS_REPO="https://github.com/svenshi/oxidns"
 readonly OXIDNS_DEFAULT_VER="v1.7.1"
@@ -509,7 +511,8 @@ create_system_backup() {
     for path in /etc/nginx /etc/xray /etc/oxidns /etc/adguardhome /etc/ufw "${CERT_DIR}" "${STATE_DIR}/settings" "${DNS_ASSETS_DIR}" "${IPSET_SAVE_FILE}"; do
         if [[ -e "${path}" ]]; then
             local rel_path="${path#/}"
-            local parent_dir="${CURRENT_BACKUP_DIR}/fs/$(dirname "${rel_path}")"
+            local parent_dir
+            parent_dir="${CURRENT_BACKUP_DIR}/fs/$(dirname "${rel_path}")"
             mkdir -p "${parent_dir}"
             chmod 0755 "${CURRENT_BACKUP_DIR}/fs" "${CURRENT_BACKUP_DIR}/fs/etc" "${CURRENT_BACKUP_DIR}/fs/var" "${CURRENT_BACKUP_DIR}/fs/var/lib" 2>/dev/null || true
             cp -a "${path}" "${CURRENT_BACKUP_DIR}/fs/${rel_path}"
