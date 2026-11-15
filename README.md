@@ -1,5 +1,8 @@
 # Unified SmartDNS + Transparent SNI Proxy (Stealth Edition)
 
+[![Bash Syntax & ShellCheck](https://github.com/EvgenyElizarenko/smartdns-installer/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/EvgenyElizarenko/smartdns-installer/actions/workflows/shellcheck.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/EvgenyElizarenko/smartdns-installer/blob/main/LICENSE)
+
 Транзакционный Bash-установщик (`v2.10.0-stealth`) для развёртывания защищённого узла выборочной маршрутизации трафика на базе **SmartDNS (`OxiDNS` / `AdGuardHome`)**, прозрачного SNI-прокси (**`Xray-core`**), веб-сервера (**`Nginx`**) и ядерной фильтрации пакетов (**`ipset` / `netfilter`**).
 
 Система спроектирована для работы в условиях активного DPI-анализа: снаружи сервер выглядит как обычный корпоративный статический веб-сайт с валидным TLS-сертификатом Let's Encrypt и процедурно сгенерированным дизайном, а весь целевой трафик авторизованных устройств проксируется прозрачно без установки VPN-клиентов.
@@ -124,7 +127,7 @@
 | **Внешние порты** | `22/TCP` (или кастомный SSH), `80/TCP`, `443/TCP`, `853/TCP` | Все остальные порты закрываются на уровне firewall |
 
 ### Домен и DNS-провайдер
-1. Собственное доменное имя второго уровня (`ROOT_DOMAIN`, например `example.com`), делегированное на NS-серверы **Cloudflare**.
+1. Собственный домен второго уровня (`ROOT_DOMAIN`, например `example.com`), делегированный на NS-серверы **Cloudflare**.
 2. Пользовательский API-токен Cloudflare с разрешением **`Zone — DNS — Edit`** для целевой зоны.
 3. Все DNS-записи домена должны работать в режиме **DNS Only** (серое облако, без проксирования через CDN Cloudflare).
 
@@ -132,20 +135,21 @@
 
 ## 5. Установка и первоначальная настройка
 
-1. **Скачайте скрипт на сервер и назначьте права на выполнение:**
+1. **Загрузите скрипт на сервер и назначьте права на выполнение:**
    ```bash
-   chmod +x unified-smartdns-installer.sh
+   curl -fsSL [https://raw.githubusercontent.com/EvgenyElizarenko/smartdns-installer/main/smartdns-installer-v2.10.0-stealth.sh](https://raw.githubusercontent.com/EvgenyElizarenko/smartdns-installer/main/smartdns-installer-v2.10.0-stealth.sh) -o smartdns-installer-v2.10.0-stealth.sh
+   chmod +x smartdns-installer-v2.10.0-stealth.sh
    ```
 
 2. **Выполните предварительную диагностику сервера (режим только чтения):**
    ```bash
-   sudo ./unified-smartdns-installer.sh --preflight
+   sudo ./smartdns-installer-v2.10.0-stealth.sh --preflight
    ```
    Скрипт проверит версию ОС, ядро, объём RAM/диска, сетевые интерфейсы, наличие Docker и занятые порты, не внося никаких изменений в систему.
 
 3. **Запустите интерактивный мастер установки:**
    ```bash
-   sudo ./unified-smartdns-installer.sh --install
+   sudo ./smartdns-installer-v2.10.0-stealth.sh --install
    ```
    Мастер запросит:
    - выбор DNS-движка (`1` — OxiDNS, `2` — AdGuardHome);
@@ -162,7 +166,7 @@
 
 ## 6. Полный справочник команд CLI
 
-Все управляющие команды выполняются от имени `root` (`sudo ./unified-smartdns-installer.sh <КОМАНДА>`):
+Все управляющие команды выполняются от имени `root` (`sudo ./smartdns-installer-v2.10.0-stealth.sh <КОМАНДА>`):
 
 ### Установка, диагностика и тестирование
 | Команда | Описание действия |
@@ -260,7 +264,7 @@ sudo grep -E '^(ROOT_DOMAIN|DOT_HOST|DOH_PATH)=' /var/lib/oxidns-installer/setti
 
 - **Комплексная самодиагностика:**
   ```bash
-  sudo ./unified-smartdns-installer.sh --test
+  sudo ./smartdns-installer-v2.10.0-stealth.sh --test
   ```
 - **Добавление собственных доменов в исключения или проксируемый список:**
   Запишите домены (по одному на строку) в `/var/lib/dns-assets/custom-allow.txt` или `/var/lib/dns-assets/custom-deny.txt` и примените изменения:
@@ -269,5 +273,5 @@ sudo grep -E '^(ROOT_DOMAIN|DOT_HOST|DOH_PATH)=' /var/lib/oxidns-installer/setti
   ```
 - **Аварийный откат к предыдущему рабочему состоянию:**
   ```bash
-  sudo ./unified-smartdns-installer.sh --rollback
+  sudo ./smartdns-installer-v2.10.0-stealth.sh --rollback
   ```
