@@ -1,204 +1,273 @@
+# Unified SmartDNS + Transparent SNI Proxy (Stealth Edition)
 
+Транзакционный Bash-установщик (`v2.10.0-stealth`) для развёртывания защищённого узла выборочной маршрутизации трафика на базе **SmartDNS (`OxiDNS` / `AdGuardHome`)**, прозрачного SNI-прокси (**`Xray-core`**), веб-сервера (**`Nginx`**) и ядерной фильтрации пакетов (**`ipset` / `netfilter`**).
 
-\# Unified SmartDNS + Transparent SNI Proxy
+Система спроектирована для работы в условиях активного DPI-анализа: снаружи сервер выглядит как обычный корпоративный статический веб-сайт с валидным TLS-сертификатом Let's Encrypt и процедурно сгенерированным дизайном, а весь целевой трафик авторизованных устройств проксируется прозрачно без установки VPN-клиентов.
 
+---
 
+## Содержание
 
-\*\*Version:\*\* 2.10.0-stealth
+1. [Назначение и решаемые задачи](#1-назначение-и-решаемые-задачи)
+2. [Архитектура и схема прохождения трафика](#2-архитектура-и-схема-прохождения-трафика)
+3. [Подробный разбор функциональности](#3-подробный-разбор-функциональности)
+4. [Требования к серверу и домену](#4-требования-к-серверу-и-домену)
+5. [Установка и первоначальная настройка](#5-установка-и-первоначальная-настройка)
+6. [Полный справочник команд CLI](#6-полный-справочник-команд-cli)
+7. [Файловая структура и системные службы](#7-файловая-структура-и-системные-службы)
+8. [Подключение клиентских устройств](#8-подключение-клиентских-устройств)
+9. [Модель безопасности и защита от утечек](#9-модель-безопасности-и-защита-от-утечек)
+10. [Диагностика, резервное копирование и откат](#10-диагностика-резервное-копирование-и-откат)
 
+---
 
+## 1. Назначение и решаемые задачи
 
-A unified Bash installer for deploying SmartDNS and Transparent SNI Proxy infrastructure on Debian and Ubuntu servers.
+Классические VPN-туннели заворачивают весь трафик устройства через удалённый сервер, что снижает скорость доступа к локальным сервисам, вызывает конфликты с банковскими приложениями и оставляет характерные сигнатуры туннельных протоколов.
 
+**Unified SmartDNS + Transparent SNI Proxy** решает эту задачу иначе:
+- **Выборочная маршрутизация:** через сервер проходит только TLS-трафик к доменам из управляемых списков (`GeoHideDNS` + пользовательский `custom-allow.txt`). Весь остальной трафик (видеохостинги, CDN, локальные сайты, игры, торренты) идёт напрямую с устройства пользователя через его интернет-провайдера.
+- **Отсутствие клиентского ПО:** на смартфоне, ПК или роутере настраивается только стандартный шифрованный DNS (**DoH** или **DoT**).
+- **Устойчивость к активному зондированию:** любые запросы без знания секретного URL DoH или точного поддомена DoT попадают на обычный статический веб-сайт с корректным TLS-сертификатом.
 
+---
 
-\## Features
+## 2. Архитектура и схема прохождения трафика
 
+Скрипт объединяет четыре изолированных компонента в единый конвейер обработки запросов:
 
-
-\- Automated installation and configuration of the network stack.
-
-\- Support for OxiDNS and AdGuard Home DNS backends.
-
-\- Transparent SNI Proxy integration with Xray.
-
-\- DNS-over-HTTPS (DoH) and DNS-over-TLS (DoT).
-
-\- TLS certificate management.
-
-\- GeoHide DNS integration.
-
-\- Domain-based routing and filtering.
-
-\- Firewall and network configuration.
-
-\- Automatic configuration backups and rollback.
-
-\- Transaction-based installation and updates.
-
-\- Diagnostic and functional testing tools.
-
-
-
-\## Supported operating systems
-
-
-
-\- Debian 12
-
-\- Debian 13 (Trixie)
-
-\- Ubuntu 22.04 LTS
-
-\- Ubuntu 24.04 LTS
-
-
-
-\## Requirements
-
-
-
-\- Root access.
-
-\- A supported Linux distribution.
-
-\- A public IPv4 address.
-
-\- A registered domain name.
-
-\- Access to configure DNS records.
-
-\- Internet connectivity.
-
-
-
-\## Installation
-
-
-
-Download the installer:
-
-
-
-```bash
-
-wget -O smartdns-installer.sh \\
-
-https://raw.githubusercontent.com/EvgenyElizarenko/smartdns-installer/main/smartdns-installer-v2.10.0-stealth.sh
-
+```text
+[Клиентское устройство]
+   │
+   ├── 1. Шифрованный DNS-запрос
+   │      ├── DoH (443/TCP): Nginx (9443/9444) ──► location = /resolve/<DOH_PATH> ──► 127.0.0.1:8053
+   │      └── DoT (853/TCP): Xray dot-in (853) ──► Nginx stream TLS (127.0.0.1:8853) ──► 127.0.0.1:5353
+   │                                                                                          │
+   │             ┌────────────────────────────────────────────────────────────────────────────┘
+   │             ▼
+   │      [DNS Backend: OxiDNS или AdGuardHome]
+   │        • Реклама и трекеры ──► NXDOMAIN / 0.0.0.0
+   │        • Обычные домены ──► Реальный IP (через 1.1.1.1 / 8.8.8.8 DoH) ──► Трафик идёт мимо сервера
+   │        • Целевые домены ──► A = <SERVER_IPV4>; AAAA / HTTPS / SVCB = NOERROR (NODATA)
+   │
+   ├── 2. Динамическая авторизация IP (Watchers ──► ipset)
+   │      └── doh-ipset-watcher / dot-ipset-watcher добавляют IP клиента в smartdns_clients (TTL 86400s)
+   │
+   └── 3. HTTPS-соединение с целевым ресурсом (443/TCP)
+          └── iptables SMARTDNS_PREROUTING:
+                ├── IP клиента в ipset ──► REDIRECT на 8444/TCP (Xray dokodemo-door, user=xray)
+                │     ├── SNI в белом списке ──► outbound direct-v4 (прозрачное проксирование)
+                │     └── Посторонний SNI / свой домен ──► 127.0.0.1:9444 (Nginx + PROXY protocol)
+                └── Неизвестный IP ──► REDIRECT на 9443/TCP (Nginx ──► процедурный Cover Site)
 ```
 
+---
 
+## 3. Подробный разбор функциональности
 
-Make it executable:
+### 3.1. Процедурный генератор сайта-заглушки (Cover Site)
+При каждой новой чистой установке скрипт алгоритмически генерирует **уникальный статический веб-сайт** без использования заранее заготовленных HTML-шаблонов или внешних API:
+- **Криптографическая случайность:** все параметры выбираются на основе энтропии из `/dev/urandom` (`od -An -tu4 -N4 /dev/urandom`).
+- **Вариативный визуальный стиль:** процедурный расчёт цветовых схем в пространстве HSL (монохромные, комплементарные, триадные, светлые и тёмные темы), подбор шрифтовых стеков, радиусов скругления (`0px`–`16px`), ширины контейнеров (`1040px`–`1260px`), стилей карточек и геометрических фоновых паттернов.
+- **Уникальный векторный логотип:** генерация `/favicon.svg` на основе случайных геометрических примитивов и инициалов сгенерированного бренда.
+- **Динамическая структура DOM:** алгоритмическое перемешивание порядка и состава информационных секций (алгоритм Фишера–Йетса), вариативная сетка колонок и интерактивные `<details>/<summary>` элементы (полностью работоспособные при отключённом JavaScript и строгом заголовке `Content-Security-Policy: script-src 'none'`).
+- **Комбинаторный контент и безопасность:** сборка грамматически связных описаний, проектов и контактных блоков из согласованных предметных словарей с обязательным HTML-экранированием (`html_escape`) и проверкой на отсутствие технических терминов (`xray`, `nginx`, `oxidns`, `adguard`, IP-адресов).
+- **Контроль уникальности и защита от перезаписи:** вычисление `SHA-256` итогового `index.html` и сравнение с предыдущей версией. Обычное обновление (`--update`) не затрагивает существующий сайт; для осознанной перегенерации предусмотрена отдельная команда `--regenerate-cover`.
 
+### 3.2. Переключаемый DNS-бэкенд (`OxiDNS` ↔ `AdGuardHome`)
+Скрипт поддерживает два взаимозаменяемых DNS-движка на единых локальных сокетах `127.0.0.1:5353` (UDP/TCP) и `127.0.0.1:8053` (HTTP DoH):
 
+| Характеристика | OxiDNS (по умолчанию) | AdGuardHome |
+| :--- | :--- | :--- |
+| **Язык и архитектура** | Rust, конвейер плагинов YAML | Go, фильтрация через `$dnsrewrite` |
+| **Блокировка рекламы** | Нативно через `geosite.dat` (`category-ads-all`) | Списки фильтров `AdGuardSDNSFilter` |
+| **Веб-интерфейс** | Отсутствует (минимальное потребление RAM) | Встроенная панель статистики (локально `127.0.0.1:8053`) |
+| **Архитектуры CPU** | `x86_64` | `x86_64`, `aarch64` |
 
+Переключение между движками выполняется на работающем сервере командой `--switch-engine [oxidns|adguardhome]` с сохранением бинарных файлов, конфигураций обоих движков, сертификатов и списков `ipset`.
+
+### 3.3. Прозрачный SNI-прокси (`Xray-core`)
+- Входящий трафик на порт `8444/TCP` (`dokodemo-door`) анализируется модулем `sniffing` (`destOverride: ["tls"]`), который извлекает доменное имя из открытого поля `Server Name Indication (SNI)` пакета `TLS ClientHello` без расшифровки трафика.
+- Соединения к доменам из списка маршрутизации направляются в `direct-v4` (`domainStrategy: UseIPv4`).
+- Все остальные запросы (включая прямые обращения к `ROOT_DOMAIN` и посторонние SNI) перенаправляются в `Nginx` на `127.0.0.1:9444` с передачей реального IP клиента по протоколу **PROXY protocol v1**.
+
+### 3.4. Трёхуровневая динамическая авторизация (`ipset` + Watchers)
+Доступ к проксирующему порту `8444/TCP` разрешён только IP-адресам, присутствующим в ядерных таблицах `ipset` (`smartdns_clients` для IPv4 и `smartdns_clients6` для IPv6) со временем жизни **24 часа (`86400` секунд)**:
+1. **Авторизация через DoH:** `doh-ipset-watcher` отслеживает `/var/log/nginx/doh-auth.log` и добавляет IP клиента при каждом валидном RFC 8484 запросе (`GET` или `POST`) к `/resolve/<DOH_PATH>`.
+2. **Авторизация через DoT:** `dot-ipset-watcher` отслеживает `/var/log/xray/access.log` и добавляет IP клиента при успешном подключении к порту `853/TCP` с точным секретным SNI `<prefix>.<ROOT_DOMAIN>`.
+3. **One-Tap Web-Auth закладка:** открытие секретного URL `https://<ROOT_DOMAIN>/auth/<DOH_PATH>` в браузере мгновенно вносит текущий IPv4/IPv6 устройства в белый список.
+
+Состояние `ipset` периодически сохраняется на диск (`/var/lib/oxidns-installer/ipset-whitelist.save`) и автоматически восстанавливается при перезагрузке сервера службой `smartdns-firewall.service`.
+
+### 3.5. Гранулярный контроль доступа к DoT (`853/TCP`)
+Помимо защиты по секретному поддомену `DOT_HOST` и лимиту частоты подключений (`30/min`), скрипт позволяет управлять предварительной IP-фильтрацией на порту `853/TCP` независимо от DoH (`443/TCP`):
+- `--whitelist-toggle on/off` — включает или отключает проверку `ipset` в цепочке `SMARTDNS_INPUT` для порта `853/TCP`.
+- `--whitelist-mode shared/separate` — выбирает между общим списком `smartdns_clients` (авторизация через DoH автоматически открывает доступ к DoT) и изолированным списком `dot_clients` (доступ к DoT открывается только через `/auth/`, прямой DoT или `--whitelist-add`).
+
+### 3.6. Автоматизация DNS, TLS и списков маршрутизации
+- **Cloudflare API:** автоматическое создание и обновление записей `A` (и `AAAA` при наличии IPv6) для `<ROOT_DOMAIN>`, `*.<ROOT_DOMAIN>` и `<prefix>.<ROOT_DOMAIN>` в режиме **DNS Only** (`proxied: false`).
+- **Wildcard TLS-сертификат:** выпуск и автопродление ECDSA (`ec-256`) сертификата через `acme.sh` по методу **DNS-01** с криптографической проверкой соответствия публичного и приватного ключей (`verify-tls-keys.sh`).
+- **Ежедневные обновления по расписанию:** таймеры `geosite-update.timer` (04:00 MSK) и `geohide-update.timer` (04:05 MSK) загружают свежие списки доменов, применяют пользовательские исключения (`custom-allow.txt` / `custom-deny.txt`), проверяют сгенерированный JSON командой `xray run -test` и безопасно перезагружают службы.
+
+---
+
+## 4. Требования к серверу и домену
+
+### Серверная часть
+| Параметр | Минимальное требование | Примечание |
+| :--- | :--- | :--- |
+| **Операционная система** | Debian 12 (Bookworm), Debian 13 (Trixie), Ubuntu 22.04 LTS, Ubuntu 24.04 LTS | Чистая установка ОС без сторонних веб-панелей |
+| **Архитектура CPU** | `x86_64` (`amd64`) или `aarch64` (`arm64`) | Для `aarch64` поддерживается только `AdGuardHome` |
+| **Оперативная память** | Минимум **512 МБ** (рекомендуется от **1 ГБ**) | Проверяется автоматически на этапе `--preflight` |
+| **Свободное место на диске** | Минимум **1.5 ГБ** | Для бинарных файлов, баз `geosite.dat` и резервных копий |
+| **Сетевой интерфейс** | Выделенный статический публичный **IPv4-адрес** | Наличие IPv6 опционально (защита `ip6tables` настраивается автоматически) |
+| **Внешние порты** | `22/TCP` (или кастомный SSH), `80/TCP`, `443/TCP`, `853/TCP` | Все остальные порты закрываются на уровне firewall |
+
+### Домен и DNS-провайдер
+1. Собственное доменное имя второго уровня (`ROOT_DOMAIN`, например `example.com`), делегированное на NS-серверы **Cloudflare**.
+2. Пользовательский API-токен Cloudflare с разрешением **`Zone — DNS — Edit`** для целевой зоны.
+3. Все DNS-записи домена должны работать в режиме **DNS Only** (серое облако, без проксирования через CDN Cloudflare).
+
+---
+
+## 5. Установка и первоначальная настройка
+
+1. **Скачайте скрипт на сервер и назначьте права на выполнение:**
+   ```bash
+   chmod +x unified-smartdns-installer.sh
+   ```
+
+2. **Выполните предварительную диагностику сервера (режим только чтения):**
+   ```bash
+   sudo ./unified-smartdns-installer.sh --preflight
+   ```
+   Скрипт проверит версию ОС, ядро, объём RAM/диска, сетевые интерфейсы, наличие Docker и занятые порты, не внося никаких изменений в систему.
+
+3. **Запустите интерактивный мастер установки:**
+   ```bash
+   sudo ./unified-smartdns-installer.sh --install
+   ```
+   Мастер запросит:
+   - выбор DNS-движка (`1` — OxiDNS, `2` — AdGuardHome);
+   - основной домен (`ROOT_DOMAIN`) и поддомен для DoT (`DOT_HOST`);
+   - генерацию криптографически случайного секретного пути `DOH_PATH` (52 символа);
+   - режим предварительного IP-whitelist для DoT (`853/TCP`);
+   - фильтры фоновых системных доменов Google (`EXCLUDE_GOOGLE_SYS`) и Xbox Live (`INCLUDE_XBOX_IPIFY`);
+   - API-токен Cloudflare и контактный email для Let's Encrypt.
+
+4. **Сохраните реквизиты подключения:**
+   По завершении установки публичный отчёт сохраняется в текущем каталоге (`smartdns-installation-report-<TIMESTAMP>.txt`), а полные секретные ссылки DoH, `/auth/` и данные доступа к AdGuardHome — в `/var/lib/oxidns-installer/credentials-<TIMESTAMP>.txt` и `/var/lib/oxidns-installer/secrets.env` (права `0600`).
+
+---
+
+## 6. Полный справочник команд CLI
+
+Все управляющие команды выполняются от имени `root` (`sudo ./unified-smartdns-installer.sh <КОМАНДА>`):
+
+### Установка, диагностика и тестирование
+| Команда | Описание действия |
+| :--- | :--- |
+| `--help` / `-h` | Вывод справки по всем поддерживаемым режимам работы. |
+| `--preflight` | Проверка готовности ОС, ресурсов, сети и сокетов без изменения системы. |
+| `--install` | Полная интерактивная транзакционная установка стека с нуля. |
+| `--status` | Вывод активного `DNS_ENGINE`, статуса всех служб/таймеров и содержимого `ipset`. |
+| `--test` | Запуск **25 функциональных и негативных автотестов** (проверка служб, прав без `root`, криптографии сертификата, подмены DNS, `NODATA` для `AAAA`/`TYPE65`, маскировки 404, DoH, `/auth/`, DoT, firewall, TTL `ipset` и валидации JSON в Xray). |
+
+### Управление движками, сайтом-заглушкой, доменом и IP
+| Команда | Описание действия |
+| :--- | :--- |
+| `--switch-engine [oxidns\|adguardhome]` | Транзакционное переключение активного DNS-движка на работающем сервере с сохранением сертификатов, секретов и файлов обоих движков. |
+| `--regenerate-cover` | Осознанная генерация нового уникального Cover Site с предварительным созданием резервной копии. |
+| `--sync-ip` | Автоматическое определение нового IPv4/IPv6 сервера, обновление локальных конфигов, правил `iptables`/`ipset` и синхронизация записей в Cloudflare через API. |
+| `--change-domain [NEW_DOMAIN]` | Быстрая смена основного домена (`ROOT_DOMAIN`) и перевыпуск сертификата с сохранением прежнего префикса DoT и секретного пути `DOH_PATH`. |
+| `--update` | Безопасное обновление бинарников Xray/DNS и списков доменов с сохранением текущего Cover Site. |
+| `--backup` | Создание внеплановой полной резервной копии конфигураций, сертификатов и правил firewall. |
+| `--rollback [ПУТЬ]` | Аварийный откат системы к последней (или указанной) резервной копии. |
+| `--uninstall` | Остановка и отключение всех служб и таймеров стека, очистка цепочек `SMARTDNS_*` из firewall (резервные копии сохраняются). |
+
+### Управление DoT IP-whitelist (`853/TCP`)
+| Команда | Описание действия |
+| :--- | :--- |
+| `--whitelist-status` | Отображение статуса DoT whitelist (`ENABLED`/`DISABLED`), режима наборов и списка авторизованных IPv4/IPv6 с остатком TTL. |
+| `--whitelist-toggle [on\|off]` | Включение (`on`), отключение (`off`) или инверсия (без аргумента) IP-фильтрации на порту `853/TCP` без затрагивания DoH (`443/TCP`). |
+| `--whitelist-mode [shared\|separate]` | Переключение между общим набором `smartdns_clients` (`shared`) и изолированным набором `dot_clients` (`separate`) для DoT. |
+| `--whitelist-add <IP>` | Ручное добавление одиночного IPv4 или IPv6 адреса в белый список на `86400` секунд. |
+| `--whitelist-remove <IP>` | Немедленное удаление одиночного IPv4 или IPv6 адреса из белого списка. |
+| `--whitelist-flush` | Полная очистка списков разрешённых IP-адресов для DoT. |
+
+---
+
+## 7. Файловая структура и системные службы
+
+### Основные каталоги и файлы
+- `/var/lib/oxidns-installer/settings` — основные параметры развёртывания (`0600`).
+- `/var/lib/oxidns-installer/secrets.env` — секретный путь `DOH_PATH`, токен Cloudflare и учётные данные AdGuardHome (`0600`).
+- `/var/lib/oxidns-installer/backups/` — транзакционные резервные копии конфигураций, правил `iptables` и дампов `ipset`.
+- `/var/lib/dns-assets/` — списки доменов (`geohide-domains.txt`, `geohide-hosts.txt`, `ag-smartdns-rules.txt`), база `geosite.dat`, а также пользовательские файлы `custom-allow.txt` и `custom-deny.txt`.
+- `/etc/xray/conf.d/00-base.json` и `/etc/xray/rules.d/10-smartdns-routing.json` — конфигурация и правила маршрутизации Xray.
+- `/etc/nginx/nginx.conf` — конфигурация Nginx (порты `80`, `9443`, `127.0.0.1:9444` PROXY protocol и `127.0.0.1:8853` stream TLS).
+- `/etc/ssl/smartdns/` — активный ECDSA wildcard-сертификат (`fullchain.pem`, `privkey.pem`).
+- `/var/www/studio-nord/` — директория сгенерированного статического Cover Site.
+- `/var/log/oxidns-installer/` — журналы работы установщика (`installation.log`, `firewall.log`, `dns.log`, `xray.log`, `certificate.log`, `update.log`, `rollback.log`).
+
+### Системные службы (`systemd`)
+- `oxidns.service` / `adguardhome.service` — активный DNS-движок (`127.0.0.1:5353` и `127.0.0.1:8053`).
+- `xray.service` — прозрачный SNI-прокси (`0.0.0.0:8444` и `0.0.0.0:853`).
+- `xray-reload.path` / `xray-reload.service` — отслеживание изменений правил маршрутизации с автоматической валидацией перед перезапуском.
+- `nginx.service` — веб-сервер маскировки, терминирования TLS и проксирования DoH/DoT.
+- `smartdns-firewall.service` — применение цепочек `SMARTDNS_*` и восстановление `ipset` при загрузке ОС.
+- `doh-ipset-watcher.service` и `dot-ipset-watcher.service` — службы динамической авторизации клиентских IP.
+- `geosite-update.timer` и `geohide-update.timer` — ежедневное автообновление баз доменов.
+
+---
+
+## 8. Подключение клиентских устройств
+
+Посмотреть актуальные реквизиты на сервере:
 ```bash
-
-chmod +x smartdns-installer.sh
-
+sudo grep -E '^(ROOT_DOMAIN|DOT_HOST|DOH_PATH)=' /var/lib/oxidns-installer/settings /var/lib/oxidns-installer/secrets.env
 ```
 
-
-
-Check server compatibility:
-
-
-
-```bash
-
-sudo ./smartdns-installer.sh --preflight
-
-```
-
-
-
-Start interactive installation:
-
-
-
-```bash
-
-sudo ./smartdns-installer.sh --install
-
-```
-
-
-
-\## Available commands
-
-
-
-| Command | Description |
-
-|---|---|
-
-| `--help` | Display help |
-
-| `--preflight` | Check server readiness |
-
-| `--install` | Full interactive installation |
-
-| `--switch-engine` | Switch DNS backend |
-
-| `--sync-ip` | Synchronize server IP |
-
-| `--change-domain` | Change the main domain |
-
-| `--update` | Update components and lists |
-
-| `--regenerate-cover` | Regenerate Cover Site |
-
-| `--status` | Show service status |
-
-| `--test` | Run functional tests |
-
-| `--backup` | Create a configuration backup |
-
-| `--rollback` | Restore the latest backup |
-
-| `--uninstall` | Remove installed components |
-
-
-
-\## DNS backends
-
-
-
-Two DNS engines are supported:
-
-
-
-\- OxiDNS
-
-\- AdGuard Home
-
-
-
-The DNS engine is selected during installation.
-
-
-
-\## Disclaimer
-
-
-
-This software modifies system networking, firewall rules, DNS services, proxy configuration and TLS certificates.
-
-
-
-Use it only on servers you own or are authorized to administer.
-
-
-
-Always review the configuration and maintain an independent backup before installation.
-
-
-
-\## Version
-
-
-
-Current release: `2.10.0-stealth`
-
+- **Браузеры (Chrome, Edge, Brave, Firefox на Windows / macOS / Linux):**
+  В настройках безопасности браузера включите **Безопасный DNS (DNS-over-HTTPS)**, выберите пользовательского провайдера и укажите:
+  `https://example.com/resolve/<DOH_PATH>`
+- **Android (9 и новее):**
+  Откройте **Настройки → Сеть и интернет → Персональный DNS-сервер (Private DNS)**, выберите *Имя хоста провайдера персонального DNS* и введите ваш `DOT_HOST` (например, `abcdefghij.example.com`). Если на сервере включён `DOT_WHITELIST_ENABLED="true"`, предварительно откройте в мобильном браузере закладку `https://example.com/auth/<DOH_PATH>`.
+- **iOS / iPadOS и macOS:**
+  Используйте системный конфигурационный профиль `.mobileconfig` с параметром `DNSProtocol = HTTPS` и `ServerURL = https://example.com/resolve/<DOH_PATH>`.
+- **Роутеры (Keenetic, OpenWrt, MikroTik):**
+  Настройте встроенный клиент DoH на `https://example.com/resolve/<DOH_PATH>` (или DoT на `<DOT_HOST>:853`) и отключите получение DNS-серверов от интернет-провайдера (`peerdns = 0`).
+- **Доступ к веб-панели AdGuardHome (если выбран этот движок):**
+  Порт `8053` закрыт снаружи; для входа откройте SSH-туннель с вашего ПК:
+  ```bash
+  ssh -L 8053:127.0.0.1:8053 user@203.0.113.10
+  ```
+  После этого панель доступна по адресу `http://127.0.0.1:8053` (логин и пароль хранятся в `/var/lib/oxidns-installer/secrets.env`).
+
+---
+
+## 9. Модель безопасности и защита от утечек
+
+- **Минимальные привилегии:** `Xray` работает от пользователя `xray`, `OxiDNS` — от `oxidns`, `AdGuardHome` — от `adguard`, `Nginx` — от `www-data`. Ни один сетевой демон не работает от `root`.
+- **Защита от Routing Loop и SSRF:** цепочка `SMARTDNS_OUTPUT` блокирует исходящие подключения процесса `xray` к `127.0.0.0/8`, частным сетям RFC 1918, link-local `169.254.0.0/16` и собственному публичному IP сервера.
+- **Закрытие внутренних портов:** входящие пакеты извне на порты `5353`, `8053`, `8853`, `9443`, `9444`, `8443`, `3000` принудительно отбрасываются (`DROP`).
+- **Защита секретов в журналах:** в `nginx.conf` используется кастомный формат логов без записи `$request_uri`, поэтому секретный путь `DOH_PATH` никогда не попадает в файлы журналов на диске.
+- **Предотвращение утечек IPv6 и HTTP/3:** для всех доменов из списка проксирования DNS-сервер возвращает `NOERROR` с пустой секцией ответов (`NODATA`) на запросы типов `AAAA`, `HTTPS` (`TYPE65`) и `SVCB` (`TYPE64`), принуждая браузер использовать IPv4 TLS через SNI-прокси.
+
+---
+
+## 10. Диагностика, резервное копирование и откат
+
+- **Комплексная самодиагностика:**
+  ```bash
+  sudo ./unified-smartdns-installer.sh --test
+  ```
+- **Добавление собственных доменов в исключения или проксируемый список:**
+  Запишите домены (по одному на строку) в `/var/lib/dns-assets/custom-allow.txt` или `/var/lib/dns-assets/custom-deny.txt` и примените изменения:
+  ```bash
+  sudo /usr/local/bin/update-geohide-domains.sh
+  ```
+- **Аварийный откат к предыдущему рабочему состоянию:**
+  ```bash
+  sudo ./unified-smartdns-installer.sh --rollback
+  ```
