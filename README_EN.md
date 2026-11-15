@@ -242,3 +242,56 @@ Upon completing `--install`, the script outputs and stores three personal connec
   ```bash
   sudo SCRIPT_LANG=en /home/omega/unified-smartdns-installer.sh --update </dev/null
   ```
+
+---
+
+## 9. Troubleshooting
+
+If DNS queries from a client device in Russia fail or target services remain unreachable after a successful installation and passing `--test` on the server, perform the following step-by-step diagnostics from the client machine.
+
+### 9.1. Checking Server IP Blocking on TSPU (DPI)
+
+In certain foreign hosting provider subnets, traffic may be filtered by IP address or TLS handshake signatures by TSPU (especially when using IP ranges previously utilized by mass VPN services, or when connecting with ECH enabled). Verify direct reachability of the Cover Site on port `443/TCP` from a machine in Russia bypassing system DNS:
+
+```bash
+curl -vk --max-time 6 --resolve "example.com:443:<server_ip>" [https://example.com/](https://example.com/)
+```
+*(Replace `example.com` with your `ROOT_DOMAIN` and `<server_ip>` with your server's public IPv4 address.)*
+
+* **Expected result:** Successful TLS handshake (`SSL connection using TLSv1.3`), valid Let's Encrypt certificate for your domain, and an `HTTP/2 200` response serving the Cover Site.
+* **Sign of TSPU filtering:** Connection timeout (`Operation timed out after 6000 milliseconds`) at the `ClientHello` stage while the site opens normally from the server itself or outside Russia. In this case, change the server's IPv4 address (or switch hosting providers) and run `sudo ./smartdns-installer.sh --sync-ip`.
+
+### 9.2. Verifying the Secret DoH Endpoint (RFC 8484)
+
+Confirm that requests to your secret `/resolve/<DOH_PATH>` route reach the DNS engine and return a valid binary DNS response (`application/dns-message`) rather than `HTTP 404`:
+
+```bash
+curl -sS -o /dev/null -w "HTTP Status: %{http_code}\n" \
+  -H "Accept: application/dns-message" \
+  "https://<ROOT_DOMAIN>/resolve/<DOH_PATH>?dns=AAABAAABAAAAAAAAA3d3dwdleGFtcGxlA2NvbQAAAQAB"
+```
+
+* **Expected result:** `HTTP Status: 200` (which also automatically registers your external IPv4/IPv6 in `ipset`).
+* **If `404` is returned:** Verify that the 48-character `DOH_PATH` matches `/var/lib/oxidns-installer/secrets.env` and ensure Cloudflare proxying is disabled (**DNS Only / grey cloud**) for the `@` record.
+
+### 9.3. Checking DoT (`853/TCP`) Reachability and `ipset` Authorization
+
+1. **Test the TLS handshake with the DoT server from the client PC:**
+   ```bash
+   openssl s_client -connect <server_ip>:853 -servername <DOT_HOST> -brief </dev/null
+   ```
+   * **Expected result:** Established TLS session presenting the `*.<ROOT_DOMAIN>` certificate. If the connection drops immediately after `ClientHello`, open the authorization link `https://<ROOT_DOMAIN>/auth/<DOH_PATH>` in your browser (when `DOT_WHITELIST_ENABLED=true`) or verify that your ISP does not block outbound `853/TCP`.
+
+2. **Verify your client IP registration in the server whitelist:**
+   ```bash
+   sudo ./smartdns-installer.sh --whitelist-status
+   ```
+   Confirm that your current external IP address is listed with an active non-zero `timeout` (if you are behind ISP CG-NAT, ensure your browser and OS DNS client share the same outbound route without a third-party VPN active).
+
+### 9.4. Diagnosing IPv6 and Client DNS Cache Leaks
+
+* **A-record rewrite and IPv6 (`AAAA`) suppression:** Query a proxied domain directly against your DoH/DoT endpoint (for example, using `kdig` or `doggo`):
+  ```bash
+  kdig @<server_ip> +tls-host=<DOT_HOST> chatgpt.com A chatgpt.com AAAA
+  ```
+  * **Expected result:** The `ANSWER` section returns `<server_ip>` for `A` and an empty `NOERROR` response for `AAAA`. If the client receives a real IPv6 address, browsers will bypass your proxy over IPv6—disable IPv6 on the client network adapter or ensure no secondary ISP DNS server is configured on the device.
