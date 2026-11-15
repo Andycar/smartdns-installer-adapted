@@ -12,6 +12,727 @@ umask 027
 # ------------------------------ Global Constants ------------------------------
 readonly SCRIPT_NAME="unified-smartdns-installer.sh"
 INSTALLER_VERSION="2.10.0-stealth"
+
+# ------------------------------ Localization Engine (RU / EN) -----------------
+SCRIPT_LANG="${SCRIPT_LANG:-ru}"
+declare -A MSG_RU=()
+declare -A MSG_EN=()
+
+MSG_RU[M_0001]='Критическая ошибка выполнения на строке %s (код возврата: %s).'
+MSG_EN[M_0001]='Critical execution error at line %s (exit code: %s).'
+MSG_RU[M_0002]='Обнаружена незавершённая транзакция. Запуск автоматического аварийного отката...'
+MSG_EN[M_0002]='Incomplete transaction detected. Starting automatic emergency rollback...'
+MSG_RU[M_0003]='ОШИБКА: Другой экземпляр %s уже запущен (блокировка %s).\n'
+MSG_EN[M_0003]='ERROR: Another instance of %s is already running (lock %s).\n'
+MSG_RU[M_0004]='ОШИБКА: Скрипт должен запускаться с привилегиями root (sudo).\n'
+MSG_EN[M_0004]='ERROR: This script must be run with root privileges (sudo).\n'
+MSG_RU[M_0005]='Не найден /etc/os-release. Невозможно определить ОС.'
+MSG_EN[M_0005]='/etc/os-release not found. Unable to determine OS.'
+MSG_RU[M_0006]='Несовместимая ОС: %s. Поддерживаются только Debian 12/13 и Ubuntu 22.04/24.04 LTS.'
+MSG_EN[M_0006]='Incompatible OS: %s. Only Debian 12/13 and Ubuntu 22.04/24.04 LTS are supported.'
+MSG_RU[M_0007]='Недостаточно оперативной памяти: %s МБ (требуется минимум 512 МБ).'
+MSG_EN[M_0007]='Insufficient RAM: %s MB (minimum 512 MB required).'
+MSG_RU[M_0008]='Недостаточно свободного места на диске: %s МБ (требуется минимум 1500 МБ).'
+MSG_EN[M_0008]='Insufficient free disk space: %s MB (minimum 1500 MB required).'
+MSG_RU[M_0009]='Не обнаружен глобальный IPv4-адрес на основном интерфейсе %s.'
+MSG_EN[M_0009]='Global IPv4 address not detected on primary interface %s.'
+MSG_RU[M_0010]='               ОТЧЁТ PREFLIGHT (РЕЖИМ ТОЛЬКО ЧТЕНИЕ)                          \n'
+MSG_EN[M_0010]='                PREFLIGHT REPORT (READ-ONLY MODE)                             \n'
+MSG_RU[M_0011]='ОС и версия          : %s (%s / %s)\n'
+MSG_EN[M_0011]='OS and version          : %s (%s / %s)\n'
+MSG_RU[M_0012]='Ядро Linux           : %s\n'
+MSG_EN[M_0012]='Linux kernel           : %s\n'
+MSG_RU[M_0013]='Архитектура CPU      : %s (%s ядер)\n'
+MSG_EN[M_0013]='CPU architecture      : %s (%s cores)\n'
+MSG_RU[M_0014]='Оперативная память   : %s МБ\n'
+MSG_EN[M_0014]='Memory (RAM)   : %s MB\n'
+MSG_RU[M_0015]='Свободно на диске    : %s МБ\n'
+MSG_EN[M_0015]='Free disk space    : %s MB\n'
+MSG_RU[M_0016]='Основной интерфейс   : %s\n'
+MSG_EN[M_0016]='Primary interface   : %s\n'
+MSG_RU[M_0017]='Публичный IPv4       : %s\n'
+MSG_EN[M_0017]='Public IPv4       : %s\n'
+MSG_RU[M_0018]='Публичный IPv6       : %s (активен: %s)\n'
+MSG_EN[M_0018]='Public IPv6       : %s (active: %s)\n'
+MSG_RU[M_0019]='Все адреса хоста     : %s\n'
+MSG_EN[M_0019]='All host addresses     : %s\n'
+MSG_RU[M_0020]='Обнаружен (ВНИМАНИЕ: возможен конфликт NAT)'
+MSG_EN[M_0020]='Detected (WARNING: potential NAT conflict)'
+MSG_RU[M_0021]='Не обнаружен'
+MSG_EN[M_0021]='Not detected'
+MSG_RU[M_0022]='Наличие Docker       : %s\n'
+MSG_EN[M_0022]='Docker status       : %s\n'
+MSG_RU[M_0023]='Состояние существующих служб:\n'
+MSG_EN[M_0023]='Existing services state:\n'
+MSG_RU[M_0024]='  - %-15s : АКТИВНА\n'
+MSG_EN[M_0024]='  - %-15s : ACTIVE\n'
+MSG_RU[M_0025]='  - %-15s : не активна / не установлена\n'
+MSG_EN[M_0025]='  - %-15s : inactive / not installed\n'
+MSG_RU[M_0026]='Проверка совместимости с OxiDNS и AdGuardHome:\n'
+MSG_EN[M_0026]='OxiDNS and AdGuardHome compatibility check:\n'
+MSG_RU[M_0027]='  - OxiDNS      : СОВМЕСТИМ (x86_64)\n'
+MSG_EN[M_0027]='  - OxiDNS      : COMPATIBLE (x86_64)\n'
+MSG_RU[M_0028]='  - OxiDNS      : НЕ СОВМЕСТИМ (официальный бинарный релиз требует x86_64)\n'
+MSG_EN[M_0028]='  - OxiDNS      : INCOMPATIBLE (official binary release requires x86_64)\n'
+MSG_RU[M_0029]='  - AdGuardHome : СОВМЕСТИМ (%s)\n'
+MSG_EN[M_0029]='  - AdGuardHome : COMPATIBLE (%s)\n'
+MSG_RU[M_0030]='Занятые сокеты (TCP/UDP):\n'
+MSG_EN[M_0030]='Listening sockets (TCP/UDP):\n'
+MSG_RU[M_0031]='ИТОГ PREFLIGHT: Сервер соответствует требованиям для развёртывания.\n'
+MSG_EN[M_0031]='PREFLIGHT SUMMARY: Server meets deployment requirements.\n'
+MSG_RU[M_0032]='   МАСТЕР НАСТРОЙКИ UNIFIED SMARTDNS + TRANSPARENT SNI PROXY (STEALTH MODE)   \n'
+MSG_EN[M_0032]='   UNIFIED SMARTDNS + TRANSPARENT SNI PROXY SETUP WIZARD (STEALTH MODE)       \n'
+MSG_RU[M_0033]='Сравнение поддерживаемых DNS-движков:\n'
+MSG_EN[M_0033]='Supported DNS engines comparison:\n'
+MSG_RU[M_0034]='| Характеристика         | 1) OxiDNS (Rust)              | 2) AdGuardHome (Go)           |\n'
+MSG_EN[M_0034]='| Feature               | 1) OxiDNS (Rust)              | 2) AdGuardHome (Go)           |\n'
+MSG_RU[M_0035]='| Архитектура конвейера  | YAML sequence (hosts/nodata)  | DNS-правила ($dnsrewrite)     |\n'
+MSG_EN[M_0035]='| Pipeline architecture | YAML sequence (hosts/nodata)  | DNS rules ($dnsrewrite)       |\n'
+MSG_RU[M_0036]='| Блокировка рекламы     | Нативно через geosite.dat     | Списки фильтров AdGuard       |\n'
+MSG_EN[M_0036]='| Ad blocking           | Native via geosite.dat        | AdGuard filter lists          |\n'
+MSG_RU[M_0037]='| Поддержка NODATA       | Нативно через hosts/reject    | Правила $dnsrewrite=NOERROR   |\n'
+MSG_EN[M_0037]='| NODATA support        | Native via hosts/reject       | $dnsrewrite=NOERROR rules     |\n'
+MSG_RU[M_0038]='| Веб-панель управления  | Отсутствует (конфиг YAML)     | Есть (локально 127.0.0.1:8053)|\n'
+MSG_EN[M_0038]='| Web management UI     | None (YAML config)            | Yes (local 127.0.0.1:8053)    |\n'
+MSG_RU[M_0039]='| Поддержка архитектур   | Только x86_64                 | x86_64, aarch64, armv7        |\n'
+MSG_EN[M_0039]='| CPU architectures     | x86_64 only                   | x86_64, aarch64, armv7        |\n'
+MSG_RU[M_0040]='Выберите DNS-движок [1 - OxiDNS, 2 - AdGuardHome] (по умолчанию 1): '
+MSG_EN[M_0040]='Select DNS engine [1 - OxiDNS, 2 - AdGuardHome] (default 1): '
+MSG_RU[M_0041]='ОШИБКА: OxiDNS предоставляет официальную сборку только для x86_64. Ваша архитектура: %s.\n'
+MSG_EN[M_0041]='ERROR: OxiDNS provides official builds for x86_64 only. Your architecture: %s.\n'
+MSG_RU[M_0042]='Пожалуйста, введите 1 или 2.\n'
+MSG_EN[M_0042]='Please enter 1 or 2.\n'
+MSG_RU[M_0043]='Введите основной домен (ROOT_DOMAIN, например example.com): '
+MSG_EN[M_0043]='Enter primary domain (ROOT_DOMAIN, e.g. example.com): '
+MSG_RU[M_0044]='ОШИБКА: Некорректный синтаксис доменного имени.\n'
+MSG_EN[M_0044]='ERROR: Invalid domain name syntax.\n'
+MSG_RU[M_0045]='Режим маскировки DoH       : используется корневой домен https://%s/resolve/[SECRET]\n'
+MSG_EN[M_0045]='DoH camouflage mode        : using root domain https://%s/resolve/[SECRET]\n'
+MSG_RU[M_0046]='Введите поддомен для DoT (DOT_HOST, по умолчанию %s.%s): '
+MSG_EN[M_0046]='Enter DoT subdomain (DOT_HOST, default %s.%s): '
+MSG_RU[M_0047]='ОШИБКА: DOT_HOST должен быть валидным поддоменом *.%s.\n'
+MSG_EN[M_0047]='ERROR: DOT_HOST must be a valid subdomain of *.%s.\n'
+MSG_RU[M_0048]='\nНастройка секретного пути DoH и веб-авторизации (минимум 48 символов):\n'
+MSG_EN[M_0048]='\nSecret DoH and Web-Auth path configuration (minimum 48 characters):\n'
+MSG_RU[M_0049]='Сгенерировать криптографически случайный путь автоматически? [Y/n]: '
+MSG_EN[M_0049]='Generate a cryptographically random path automatically? [Y/n]: '
+MSG_RU[M_0050]='Введите собственный секретный путь DoH (не менее 48 букв/цифр): '
+MSG_EN[M_0050]='Enter custom secret DoH path (at least 48 alphanumeric characters): '
+MSG_RU[M_0051]='ОШИБКА: Путь должен содержать минимум 48 символов (только латинские буквы и цифры).\n'
+MSG_EN[M_0051]='ERROR: Path must contain at least 48 characters (Latin letters and digits only).\n'
+MSG_RU[M_0052]='\nНастройка IP-whitelist для DNS-over-TLS (DoT, TCP 853):\n'
+MSG_EN[M_0052]='\nIP whitelist configuration for DNS-over-TLS (DoT, TCP 853):\n'
+MSG_RU[M_0053]='Текущее сохранённое значение DOT_WHITELIST_ENABLED: %s (режим: %s)\n'
+MSG_EN[M_0053]='Current saved DOT_WHITELIST_ENABLED value: %s (mode: %s)\n'
+MSG_RU[M_0054]='Требуется ли включить предварительный whitelist IP-адресов для DoT (TCP 853)? [y/N]: '
+MSG_EN[M_0054]='Enable preliminary IP whitelist for DoT (TCP 853)? [y/N]: '
+MSG_RU[M_0055]='Оставить текущее значение (%s) без изменений? [Y/n]: '
+MSG_EN[M_0055]='Keep current value (%s) unchanged? [Y/n]: '
+MSG_RU[M_0056]='Выберите режим работы whitelist для DoT:\n'
+MSG_EN[M_0056]='Select DoT whitelist operating mode:\n'
+MSG_RU[M_0057]='  1 — общий whitelist smartdns_clients для DoH и DoT (по умолчанию)\n'
+MSG_EN[M_0057]='  1 — shared smartdns_clients whitelist for DoH and DoT (default)\n'
+MSG_RU[M_0058]='  2 — отдельный независимый whitelist dot_clients для DoT (с автодоступом к SNI-прокси)\n'
+MSG_EN[M_0058]='  2 — dedicated dot_clients whitelist for DoT (with auto-access to SNI proxy)\n'
+MSG_RU[M_0059]='Режим whitelist [1/2] (по умолчанию 1): '
+MSG_EN[M_0059]='Whitelist mode [1/2] (default 1): '
+MSG_RU[M_0060]='\nНастройка фильтра фоновых системных доменов Google/Android (EXCLUDE_GOOGLE_SYS):\n'
+MSG_EN[M_0060]='\nGoogle/Android background system domains filter (EXCLUDE_GOOGLE_SYS):\n'
+MSG_RU[M_0061]='  y — исключить фоновые домены (apis.google.com, *.clients.google.com и др.), сохранив generativelanguage.googleapis.com\n'
+MSG_EN[M_0061]='  y — exclude background domains (apis.google.com, *.clients.google.com, etc.), keeping generativelanguage.googleapis.com\n'
+MSG_RU[M_0062]='  N — оставить все домены Google в проксируемом списке (по умолчанию N)\n'
+MSG_EN[M_0062]='  N — keep all Google domains in the proxied list (default N)\n'
+MSG_RU[M_0063]='Исключить фоновые домены Google? [y/N]: '
+MSG_EN[M_0063]='Exclude Google background domains? [y/N]: '
+MSG_RU[M_0064]='\nНастройка дополнительных фильтров (INCLUDE_XBOX_IPIFY):\n'
+MSG_EN[M_0064]='\nAdditional domain filters configuration (INCLUDE_XBOX_IPIFY):\n'
+MSG_RU[M_0065]='  y — включить домены Xbox Live в проксируемый список\n'
+MSG_EN[M_0065]='  y — include Xbox Live domains in the proxied list\n'
+MSG_RU[M_0066]='  N — исключить их (по умолчанию N)\n'
+MSG_EN[M_0066]='  N — exclude them (default N)\n'
+MSG_RU[M_0067]='Включить домены Xbox Live? [y/N]: '
+MSG_EN[M_0067]='Include Xbox Live domains? [y/N]: '
+MSG_RU[M_0068]='Введите Cloudflare API Token (или нажмите Enter для использования сохранённого токена): '
+MSG_EN[M_0068]='Enter Cloudflare API Token (or press Enter to use saved token): '
+MSG_RU[M_0069]='ОШИБКА: API-токен Cloudflare необходим для автоматической привязки IP сервера к домену и выпуска сертификата.\n'
+MSG_EN[M_0069]='ERROR: Cloudflare API token is required for automatic DNS binding and certificate issuance.\n'
+MSG_RU[M_0070]='Введите контактный email для выпуска сертификатов Let'"'"'s Encrypt (по умолчанию admin@%s): '
+MSG_EN[M_0070]='Enter contact email for Let'"'"'s Encrypt certificates (default admin@%s): '
+MSG_RU[M_0071]='                    ПОДТВЕРЖДЕНИЕ ПАРАМЕТРОВ УСТАНОВКИ                        \n'
+MSG_EN[M_0071]='                     INSTALLATION PARAMETERS CONFIRMATION                     \n'
+MSG_RU[M_0072]='Выбранный DNS-движок       : %s (системный пользователь: %s)\n'
+MSG_EN[M_0072]='Selected DNS engine        : %s (system user: %s)\n'
+MSG_RU[M_0073]='Основной домен (Сайт + DoH): %s (единый TLS SNI профиль)\n'
+MSG_EN[M_0073]='Primary domain (Site + DoH): %s (unified TLS SNI profile)\n'
+MSG_RU[M_0074]='Домен DoT                  : %s\n'
+MSG_EN[M_0074]='DoT domain                 : %s\n'
+MSG_RU[M_0075]='Секретный путь DoH / Auth  : [СКРЫТО, длина %d симв.]\n'
+MSG_EN[M_0075]='Secret DoH / Auth path     : [HIDDEN, length %d chars]\n'
+MSG_RU[M_0076]='DoT IP-whitelist (TCP 853) : %s (режим: %s)\n'
+MSG_EN[M_0076]='DoT IP whitelist (TCP 853) : %s (mode: %s)\n'
+MSG_RU[M_0077]='Публичные порты            : 80/TCP, 443/TCP, 853/TCP\n'
+MSG_EN[M_0077]='Public ports               : 80/TCP, 443/TCP, 853/TCP\n'
+MSG_RU[M_0078]='Внутренние порты           : 8444/TCP (Xray), 9443/9444 (Nginx), 8853/TCP (DoT), 5353 (DNS), 8053 (DoH)\n'
+MSG_EN[M_0078]='Internal ports             : 8444/TCP (Xray), 9443/9444 (Nginx), 8853/TCP (DoT), 5353 (DNS), 8053 (DoH)\n'
+MSG_RU[M_0079]='План Firewall              : UFW + %s + ipset (smartdns_clients / dot_clients, TTL 86400s)\n'
+MSG_EN[M_0079]='Firewall plan              : UFW + %s + ipset (smartdns_clients / dot_clients, TTL 86400s)\n'
+MSG_RU[M_0080]='ПРЕДУПРЕЖДЕНИЕ             : Обнаружен Docker. Правила PREROUTING будут вставлены перед цепочками DOCKER.\n'
+MSG_EN[M_0080]='WARNING                    : Docker detected. PREROUTING rules will be inserted before DOCKER chains.\n'
+MSG_RU[M_0081]='Подтверждаете внесение изменений в конфигурацию сервера? [y/N]: '
+MSG_EN[M_0081]='Confirm applying changes to server configuration? [y/N]: '
+MSG_RU[M_0082]='Установка отменена пользователем.\n'
+MSG_EN[M_0082]='Installation cancelled by user.\n'
+MSG_RU[M_0083]='Создание полной резервной копии в %s...'
+MSG_EN[M_0083]='Creating full system backup in %s...'
+MSG_RU[M_0084]='Резервная копия успешно создана: %s'
+MSG_EN[M_0084]='Backup created successfully: %s'
+MSG_RU[M_0085]='Не найдена директория резервной копии для отката.'
+MSG_EN[M_0085]='Backup directory for rollback not found.'
+MSG_RU[M_0086]='Восстановление состояния системы из %s...'
+MSG_EN[M_0086]='Restoring system state from %s...'
+MSG_RU[M_0087]='Откат из резервной копии %s завершён (активный DNS backend: %s).'
+MSG_EN[M_0087]='Rollback from backup %s completed (active DNS backend: %s).'
+MSG_RU[M_0088]='Установка системных пакетов и официального репозитория Nginx...'
+MSG_EN[M_0088]='Installing system packages and official Nginx repository...'
+MSG_RU[M_0089]='Установлен стабильный Nginx версии: %s'
+MSG_EN[M_0089]='Installed stable Nginx version: %s'
+MSG_RU[M_0090]='Настройка непривилегированных пользователей, перекрёстных групп и прав доступа...'
+MSG_EN[M_0090]='Configuring unprivileged users, cross-groups, and permissions...'
+MSG_RU[M_0091]='Неподдерживаемая архитектура CPU для Xray: %s'
+MSG_EN[M_0091]='Unsupported CPU architecture for Xray: %s'
+MSG_RU[M_0092]='Проверка релизов Xray-core (базовый релиз: %s)...'
+MSG_EN[M_0092]='Checking Xray-core releases (baseline release: %s)...'
+MSG_RU[M_0093]='api.github.com недоступен, используется прямая ссылка: %s'
+MSG_EN[M_0093]='api.github.com is unreachable, using direct fallback URL: %s'
+MSG_RU[M_0094]='Загрузка Xray-core (%s) из %s...'
+MSG_EN[M_0094]='Downloading Xray-core (%s) from %s...'
+MSG_RU[M_0095]='Ошибка проверки SHA-256 архива Xray! Ожидался: %s, получен: %s'
+MSG_EN[M_0095]='Xray archive SHA-256 verification failed! Expected: %s, got: %s'
+MSG_RU[M_0096]='Установлен и проверен Xray-core: %s (%s)'
+MSG_EN[M_0096]='Installed and verified Xray-core: %s (%s)'
+MSG_RU[M_0097]='OxiDNS поддерживает только архитектуру x86_64. Текущая архитектура: %s.'
+MSG_EN[M_0097]='OxiDNS supports x86_64 architecture only. Current architecture: %s.'
+MSG_RU[M_0098]='Проверка релизов OxiDNS в официальном репозитории %s...'
+MSG_EN[M_0098]='Checking OxiDNS releases in official repository %s...'
+MSG_RU[M_0099]='Загрузка OxiDNS (%s) из %s...'
+MSG_EN[M_0099]='Downloading OxiDNS (%s) from %s...'
+MSG_RU[M_0100]='Загруженный архив OxiDNS повреждён.'
+MSG_EN[M_0100]='Downloaded OxiDNS archive is corrupted.'
+MSG_RU[M_0101]='В архиве OxiDNS не найден исполняемый файл oxidns.'
+MSG_EN[M_0101]='Executable oxidns binary not found in OxiDNS archive.'
+MSG_RU[M_0102]='OxiDNS успешно установлен в /usr/local/bin/oxidns: %s'
+MSG_EN[M_0102]='OxiDNS installed successfully in /usr/local/bin/oxidns: %s'
+MSG_RU[M_0103]='Получение информации о последнем стабильном релизе AdGuardHome...'
+MSG_EN[M_0103]='Fetching latest stable AdGuardHome release metadata...'
+MSG_RU[M_0104]='Не удалось получить стабильный релиз AdGuardHome.'
+MSG_EN[M_0104]='Failed to fetch stable AdGuardHome release metadata.'
+MSG_RU[M_0105]='Неподдерживаемая архитектура для AdGuardHome: %s'
+MSG_EN[M_0105]='Unsupported architecture for AdGuardHome: %s'
+MSG_RU[M_0106]='Не найден бинарный файл AdGuardHome после распаковки.'
+MSG_EN[M_0106]='AdGuardHome binary not found after extraction.'
+MSG_RU[M_0107]='AdGuardHome успешно установлен: %s'
+MSG_EN[M_0107]='AdGuardHome installed successfully: %s'
+MSG_RU[M_0108]='Некорректный Cloudflare API Token. Пропуск обновления DNS в Cloudflare.'
+MSG_EN[M_0108]='Invalid Cloudflare API Token. Skipping Cloudflare DNS update.'
+MSG_RU[M_0109]='CF_API_TOKEN не задан в %s. Пропуск обновления Cloudflare API.'
+MSG_EN[M_0109]='CF_API_TOKEN is not set in %s. Skipping Cloudflare API update.'
+MSG_RU[M_0110]='Получение Zone ID в Cloudflare для домена %s...'
+MSG_EN[M_0110]='Fetching Cloudflare Zone ID for domain %s...'
+MSG_RU[M_0111]='Не удалось получить Zone ID для %s через Cloudflare API. Проверьте права токена.'
+MSG_EN[M_0111]='Failed to fetch Zone ID for %s via Cloudflare API. Check token permissions.'
+MSG_RU[M_0112]='Cloudflare DNS: обновлена запись %s %s -> %s (DNS Only / proxied=false).'
+MSG_EN[M_0112]='Cloudflare DNS: updated record %s %s -> %s (DNS Only / proxied=false).'
+MSG_RU[M_0113]='Cloudflare DNS: ошибка обновления %s %s.'
+MSG_EN[M_0113]='Cloudflare DNS: failed to update record %s %s.'
+MSG_RU[M_0114]='Cloudflare DNS: создана запись %s %s -> %s (DNS Only / proxied=false).'
+MSG_EN[M_0114]='Cloudflare DNS: created record %s %s -> %s (DNS Only / proxied=false).'
+MSG_RU[M_0115]='Cloudflare DNS: ошибка создания %s %s.'
+MSG_EN[M_0115]='Cloudflare DNS: failed to create record %s %s.'
+MSG_RU[M_0116]='Cloudflare DNS: удалена неактуальная запись %s для %s (ID: %s).'
+MSG_EN[M_0116]='Cloudflare DNS: removed stale %s record for %s (ID: %s).'
+MSG_RU[M_0117]='Проверка наличия ранее выпущенного wildcard TLS-сертификата для %s...'
+MSG_EN[M_0117]='Checking for previously issued wildcard TLS certificate for %s...'
+MSG_RU[M_0118]='Найден действующий проверенный сертификат в %s. Повторный выпуск не требуется.'
+MSG_EN[M_0118]='Valid verified certificate found in %s. Re-issuance is not required.'
+MSG_RU[M_0119]='Восстановлен ранее выпущенный валидный сертификат из %s без обращения к Let'"'"'s Encrypt.'
+MSG_EN[M_0119]='Restored previously issued valid certificate from %s without contacting Let'"'"'s Encrypt.'
+MSG_RU[M_0120]='Действующий сертификат не найден. Подготовка выпуска через Cloudflare DNS-01...'
+MSG_EN[M_0120]='No valid existing certificate found. Preparing issuance via Cloudflare DNS-01...'
+MSG_RU[M_0121]='Запрос сертификата для SAN: %s и *.%s...'
+MSG_EN[M_0121]='Requesting certificate for SAN: %s and *.%s...'
+MSG_RU[M_0122]='Не удалось выпустить сертификат через Cloudflare DNS-01. Старые сертификаты сохранены.'
+MSG_EN[M_0122]='Failed to issue certificate via Cloudflare DNS-01. Existing certificates preserved.'
+MSG_RU[M_0123]='Проверка ключей нового сертификата не пройдена! Отмена установки сертификата.'
+MSG_EN[M_0123]='New certificate key pair verification failed! Aborting certificate installation.'
+MSG_RU[M_0124]='Сертификат для %s и *.%s успешно проверен и установлен.'
+MSG_EN[M_0124]='Certificate for %s and *.%s verified and installed successfully.'
+MSG_RU[M_0125]='Создание скриптов обновления geosite.dat и GeoHideDNS...'
+MSG_EN[M_0125]='Creating geosite.dat and GeoHideDNS update scripts...'
+MSG_RU[M_0126]='Формирование и проверка конфигурации OxiDNS (/etc/oxidns/config.yaml)...'
+MSG_EN[M_0126]='Generating and validating OxiDNS configuration (/etc/oxidns/config.yaml)...'
+MSG_RU[M_0127]='Формирование конфигурации AdGuardHome (/etc/adguardhome/AdGuardHome.yaml)...'
+MSG_EN[M_0127]='Generating AdGuardHome configuration (/etc/adguardhome/AdGuardHome.yaml)...'
+MSG_RU[M_0128]='Не найден модуль python3-bcrypt или утилита htpasswd для генерации хэша пароля AdGuardHome.'
+MSG_EN[M_0128]='Neither python3-bcrypt nor htpasswd utility found to generate AdGuardHome password hash.'
+MSG_RU[M_0129]='Формирование базовой конфигурации Xray (/etc/xray/conf.d/00-base.json) с поддержкой PROXY protocol...'
+MSG_EN[M_0129]='Generating base Xray configuration (/etc/xray/conf.d/00-base.json) with PROXY protocol support...'
+MSG_RU[M_0130]='Проверка Cover Site не пройдена: отсутствует или пуст %s.'
+MSG_EN[M_0130]='Cover Site verification failed: missing or empty %s.'
+MSG_RU[M_0131]='Проверка Cover Site не пройдена: отсутствует обязательный тег %s.'
+MSG_EN[M_0131]='Cover Site verification failed: missing required tag %s.'
+MSG_RU[M_0132]='Проверка Cover Site не пройдена: недостаточно секций (%s).'
+MSG_EN[M_0132]='Cover Site verification failed: insufficient sections (%s).'
+MSG_RU[M_0133]='Проверка безопасности Cover Site не пройдена: обнаружены технические ключевые слова.'
+MSG_EN[M_0133]='Cover Site security check failed: technical keywords detected.'
+MSG_RU[M_0134]='Проверка безопасности Cover Site не пройдена: обнаружен IPv4 сервера в HTML.'
+MSG_EN[M_0134]='Cover Site security check failed: server IPv4 detected in HTML.'
+MSG_RU[M_0135]='Сгенерированный index.html совпал по SHA-256 с предыдущим, требуется повторная генерация.'
+MSG_EN[M_0135]='Generated index.html matched previous SHA-256, regenerating.'
+MSG_RU[M_0136]='Существующий Cover Site обнаружен в %s; повторная генерация пропущена для сохранения текущей страницы.'
+MSG_EN[M_0136]='Existing Cover Site detected in %s; regeneration skipped to preserve the current page.'
+MSG_RU[M_0137]='Запуск процедурной генерации уникального Cover Site в %s...'
+MSG_EN[M_0137]='Starting procedural generation of a unique Cover Site in %s...'
+MSG_RU[M_0138]='Не удалось сгенерировать уникальный валидный Cover Site после 5 попыток.'
+MSG_EN[M_0138]='Failed to generate a unique valid Cover Site after 5 attempts.'
+MSG_RU[M_0139]='Уникальный Cover Site успешно сгенерирован и проверен (SHA-256 index.html: %s...).'
+MSG_EN[M_0139]='Unique Cover Site generated and verified successfully (SHA-256 index.html: %s...).'
+MSG_RU[M_0140]='Генерация конфигурации Nginx (9443 direct + 9444 PROXY protocol, DoH и /auth/ на ROOT_DOMAIN)...'
+MSG_EN[M_0140]='Generating Nginx configuration (9443 direct + 9444 PROXY protocol, DoH and /auth/ on ROOT_DOMAIN)...'
+MSG_RU[M_0141]='Создание служб динамической авторизации IP для DoH, Web-Auth и DoT...'
+MSG_EN[M_0141]='Creating dynamic IP authorization services for DoH, Web-Auth, and DoT...'
+MSG_RU[M_0142]='Настройка sysctl (TCP Keepalive + MTU Probing) и межсетевого экрана (UFW + iptables + ipset)...'
+MSG_EN[M_0142]='Configuring sysctl (TCP Keepalive + MTU Probing) and firewall (UFW + iptables + ipset)...'
+MSG_RU[M_0143]='Правила UFW, iptables (%s) и ipset успешно применены (DoT Whitelist: %s, режим: %s).'
+MSG_EN[M_0143]='UFW, iptables (%s), and ipset rules applied successfully (DoT Whitelist: %s, mode: %s).'
+MSG_RU[M_0144]='Автоматически добавлен IPv4 текущей SSH-сессии администратора (%s) в smartdns_clients и dot_clients (TTL 86400s).'
+MSG_EN[M_0144]='Automatically added current admin SSH session IPv4 (%s) to smartdns_clients and dot_clients (TTL 86400s).'
+MSG_RU[M_0145]='Автоматически добавлен IPv6 текущей SSH-сессии администратора (%s) в smartdns_clients6 и dot_clients6 (TTL 86400s).'
+MSG_EN[M_0145]='Automatically added current admin SSH session IPv6 (%s) to smartdns_clients6 and dot_clients6 (TTL 86400s).'
+MSG_RU[M_0146]='Создание изолированных systemd units с минимальными привилегиями...'
+MSG_EN[M_0146]='Creating isolated systemd unit files with least privileges...'
+MSG_RU[M_0147]='       ИЗОЛИРОВАННОЕ ТЕСТИРОВАНИЕ DNS BACKEND: %-20s          \n'
+MSG_EN[M_0147]='        ISOLATED DNS BACKEND VERIFICATION: %-20s          \n'
+MSG_RU[M_0148]='Служба %s не активна!'
+MSG_EN[M_0148]='Service %s is not active!'
+MSG_RU[M_0149]='Конфликт: альтернативный движок %s всё ещё активен!'
+MSG_EN[M_0149]='Conflict: alternative engine %s is still active!'
+MSG_RU[M_0150]='[ PASS ] Служба %s активна, конфликт с %s отсутствует\n'
+MSG_EN[M_0150]='[ PASS ] Service %s is active, no conflict with %s\n'
+MSG_RU[M_0151]='[ PASS ] Сокеты 127.0.0.1:5353 (UDP/TCP) и 127.0.0.1:8053 (TCP DoH) прослушиваются\n'
+MSG_EN[M_0151]='[ PASS ] Sockets 127.0.0.1:5353 (UDP/TCP) and 127.0.0.1:8053 (TCP DoH) are listening\n'
+MSG_RU[M_0152]='Не обнаружены ожидаемые сокеты 127.0.0.1:5353 / 127.0.0.1:8053 для %s.'
+MSG_EN[M_0152]='Expected sockets 127.0.0.1:5353 / 127.0.0.1:8053 not detected for %s.'
+MSG_RU[M_0153]='Ошибка разрешения обычного домена example.com через %s (получено: %s).'
+MSG_EN[M_0153]='Failed to resolve regular domain example.com via %s (got: %s).'
+MSG_RU[M_0154]='Ошибка повторного (кэшированного) запроса example.com.'
+MSG_EN[M_0154]='Failed on repeated (cached) query for example.com.'
+MSG_RU[M_0155]='[ PASS ] Upstream DNS и кэш работают (example.com -> %s)\n'
+MSG_EN[M_0155]='[ PASS ] Upstream DNS and cache work properly (example.com -> %s)\n'
+MSG_RU[M_0156]='Подмена A-записи не сработала в %s (ожидался %s, получено: %s).'
+MSG_EN[M_0156]='A-record rewrite failed in %s (expected %s, got: %s).'
+MSG_RU[M_0157]='[ PASS ] Правила SmartDNS подменяют проксируемый домен на %s\n'
+MSG_EN[M_0157]='[ PASS ] SmartDNS rules rewrite proxied domain to %s\n'
+MSG_RU[M_0158]='Некорректный ответ AAAA для проксируемого домена в %s.'
+MSG_EN[M_0158]='Invalid AAAA response for proxied domain in %s.'
+MSG_RU[M_0159]='Некорректный ответ HTTPS (TYPE65) для проксируемого домена в %s.'
+MSG_EN[M_0159]='Invalid HTTPS (TYPE65) response for proxied domain in %s.'
+MSG_RU[M_0160]='[ PASS ] Ответы AAAA (NOERROR/NODATA) и HTTPS TYPE65 (пустой ответ) валидны\n'
+MSG_EN[M_0160]='[ PASS ] AAAA (NOERROR/NODATA) and HTTPS TYPE65 (empty answer) responses are valid\n'
+MSG_RU[M_0161]='Фильтрация рекламы (doubleclick.net) не сработала в %s.'
+MSG_EN[M_0161]='Ad blocking (doubleclick.net) failed in %s.'
+MSG_RU[M_0162]='[ PASS ] Фильтрация рекламных доменов (doubleclick.net) активна\n'
+MSG_EN[M_0162]='[ PASS ] Ad domain filtering (doubleclick.net) is active\n'
+MSG_RU[M_0163]='Прямой DoH POST на http://127.0.0.1:8053/dns-query вернул %s.'
+MSG_EN[M_0163]='Direct DoH POST to http://127.0.0.1:8053/dns-query returned %s.'
+MSG_RU[M_0164]='[ PASS ] Прямой RFC 8484 HTTP DoH POST на 127.0.0.1:8053/dns-query работает (%s)\n'
+MSG_EN[M_0164]='[ PASS ] Direct RFC 8484 HTTP DoH POST to 127.0.0.1:8053/dns-query works (%s)\n'
+MSG_RU[M_0165]='ОШИБКА: Укажите целевой DNS backend: %s --switch-engine [oxidns|adguardhome]\n'
+MSG_EN[M_0165]='ERROR: Specify target DNS backend: %s --switch-engine [oxidns|adguardhome]\n'
+MSG_RU[M_0166]='ОШИБКА: Система не установлена (%s не найден).\n'
+MSG_EN[M_0166]='ERROR: System is not installed (%s not found).\n'
+MSG_RU[M_0167]='DNS backend %s уже активен. Запуск проверок...\n'
+MSG_EN[M_0167]='DNS backend %s is already active. Running verification...\n'
+MSG_RU[M_0168]='ОШИБКА: OxiDNS поддерживает только x86_64.\n'
+MSG_EN[M_0168]='ERROR: OxiDNS supports x86_64 only.\n'
+MSG_RU[M_0169]='Запуск транзакционного переключения DNS backend: %s -> %s...'
+MSG_EN[M_0169]='Starting transactional DNS backend switch: %s -> %s...'
+MSG_RU[M_0170]='Остановка %s.service (конфигурация сохраняется) и запуск %s.service...'
+MSG_EN[M_0170]='Stopping %s.service (configuration preserved) and starting %s.service...'
+MSG_RU[M_0171]='Служба %s не открыла порты 5353/8053 в отведённое время.'
+MSG_EN[M_0171]='Service %s did not open ports 5353/8053 within the expected timeout.'
+MSG_RU[M_0172]='Переключение DNS backend на %s успешно завершено и проверено.'
+MSG_EN[M_0172]='DNS backend switch to %s completed and verified successfully.'
+MSG_RU[M_0173]=' УСПЕШНОЕ ПЕРЕКЛЮЧЕНИЕ НА ADGUARDHOME (СЕРТИФИКАТЫ И СЕКРЕТЫ СОХРАНЕНЫ)\n'
+MSG_EN[M_0173]='  SUCCESSFULLY SWITCHED TO ADGUARDHOME (CERTIFICATES AND SECRETS PRESERVED)\n'
+MSG_RU[M_0174]='Активный DNS backend      : AdGuardHome (127.0.0.1:5353 / 127.0.0.1:8053)\n'
+MSG_EN[M_0174]='Active DNS backend        : AdGuardHome (127.0.0.1:5353 / 127.0.0.1:8053)\n'
+MSG_RU[M_0175]='Веб-интерфейс AdGuardHome : http://127.0.0.1:8053 (доступ только через SSH-туннель)\n'
+MSG_EN[M_0175]='AdGuardHome web UI        : http://127.0.0.1:8053 (access via SSH tunnel only)\n'
+MSG_RU[M_0176]='Логин администратора      : %s\n'
+MSG_EN[M_0176]='Admin username            : %s\n'
+MSG_RU[M_0177]='Пароль администратора     : [сохранён в %s]\n'
+MSG_EN[M_0177]='Admin password            : [saved in %s]\n'
+MSG_RU[M_0178]='Возврат к OxiDNS          : sudo %s --switch-engine oxidns\n'
+MSG_EN[M_0178]='Switch back to OxiDNS     : sudo %s --switch-engine oxidns\n'
+MSG_RU[M_0179]=' УСПЕШНЫЙ ВОЗВРАТ К OXIDNS (СЕРТИФИКАТЫ И СЕКРЕТЫ СОХРАНЕНЫ)\n'
+MSG_EN[M_0179]='  SUCCESSFULLY SWITCHED BACK TO OXIDNS (CERTIFICATES AND SECRETS PRESERVED)\n'
+MSG_RU[M_0180]='ОШИБКА: Файл настроек %s не найден. Сначала выполните --install.\n'
+MSG_EN[M_0180]='ERROR: Settings file %s not found. Run --install first.\n'
+MSG_RU[M_0181]='Режим whitelist       : %s (наборы DoT: %s / %s)\n'
+MSG_EN[M_0181]='Whitelist mode       : %s (DoT sets: %s / %s)\n'
+MSG_RU[M_0182]='TTL записей           : 86400 секунд\n'
+MSG_EN[M_0182]='Entry TTL            : 86400 seconds\n'
+MSG_RU[M_0183]='Файл сохранения       : %s\n'
+MSG_EN[M_0183]='Persistence file       : %s\n'
+MSG_RU[M_0184]='Разрешённые IPv4-адреса в %s (DoT 853/TCP) и оставшийся TTL:\n'
+MSG_EN[M_0184]='Authorized IPv4 addresses in %s (DoT 853/TCP) and remaining TTL:\n'
+MSG_RU[M_0185]='  (список пуст)\n'
+MSG_EN[M_0185]='  (list is empty)\n'
+MSG_RU[M_0186]='Разрешённые IPv4-адреса в smartdns_clients (DoH / SNI Proxy 443/TCP):\n'
+MSG_EN[M_0186]='Authorized IPv4 addresses in smartdns_clients (DoH / SNI Proxy 443/TCP):\n'
+MSG_RU[M_0187]='Разрешённые IPv6-адреса (%s) и оставшийся TTL:\n'
+MSG_EN[M_0187]='Authorized IPv6 addresses (%s) and remaining TTL:\n'
+MSG_RU[M_0188]='ОШИБКА: Укажите IPv4 или IPv6 адрес. Пример: %s --whitelist-add 203.0.113.10\n'
+MSG_EN[M_0188]='ERROR: Specify an IPv4 or IPv6 address. Example: %s --whitelist-add 203.0.113.10\n'
+MSG_RU[M_0189]='ОШИБКА: Добавление CIDR-диапазонов запрещено политикой безопасности. Укажите одиночный IP-адрес.\n'
+MSG_EN[M_0189]='ERROR: Adding CIDR ranges is prohibited by security policy. Specify a single IP address.\n'
+MSG_RU[M_0190]='Вручную добавлен IPv4 %s в %s и smartdns_clients (TTL 86400s).'
+MSG_EN[M_0190]='Manually added IPv4 %s to %s and smartdns_clients (TTL 86400s).'
+MSG_RU[M_0191]='УСПЕШНО: IPv4 %s добавлен в %s и smartdns_clients (TTL: 86400 сек).\n'
+MSG_EN[M_0191]='SUCCESS: IPv4 %s added to %s and smartdns_clients (TTL: 86400 sec).\n'
+MSG_RU[M_0192]='Вручную добавлен IPv6 %s в %s и smartdns_clients6 (TTL 86400s).'
+MSG_EN[M_0192]='Manually added IPv6 %s to %s and smartdns_clients6 (TTL 86400s).'
+MSG_RU[M_0193]='УСПЕШНО: IPv6 %s добавлен в %s и smartdns_clients6 (TTL: 86400 сек).\n'
+MSG_EN[M_0193]='SUCCESS: IPv6 %s added to %s and smartdns_clients6 (TTL: 86400 sec).\n'
+MSG_RU[M_0194]='ОШИБКА: Некорректный формат IPv4/IPv6 адреса: %s\n'
+MSG_EN[M_0194]='ERROR: Invalid IPv4/IPv6 address format: %s\n'
+MSG_RU[M_0195]='ОШИБКА: Укажите IPv4 или IPv6 адрес для удаления.\n'
+MSG_EN[M_0195]='ERROR: Specify an IPv4 or IPv6 address to remove.\n'
+MSG_RU[M_0196]='Удалён IPv4 %s из %s и smartdns_clients.'
+MSG_EN[M_0196]='Removed IPv4 %s from %s and smartdns_clients.'
+MSG_RU[M_0197]='УСПЕШНО: IPv4 %s удалён из %s и smartdns_clients.\n'
+MSG_EN[M_0197]='SUCCESS: IPv4 %s removed from %s and smartdns_clients.\n'
+MSG_RU[M_0198]='Удалён IPv6 %s из %s и smartdns_clients6.'
+MSG_EN[M_0198]='Removed IPv6 %s from %s and smartdns_clients6.'
+MSG_RU[M_0199]='УСПЕШНО: IPv6 %s удалён из %s и smartdns_clients6.\n'
+MSG_EN[M_0199]='SUCCESS: IPv6 %s removed from %s and smartdns_clients6.\n'
+MSG_RU[M_0200]='Очищены списки DoT whitelist (%s, %s).'
+MSG_EN[M_0200]='Flushed DoT whitelist sets (%s, %s).'
+MSG_RU[M_0201]='УСПЕШНО: Списки %s и %s полностью очищены.\n'
+MSG_EN[M_0201]='SUCCESS: Sets %s and %s have been completely flushed.\n'
+MSG_RU[M_0202]='ОШИБКА: Недопустимое значение "%s". Используйте: %s --whitelist-toggle [on|off]\n'
+MSG_EN[M_0202]='ERROR: Invalid value "%s". Usage: %s --whitelist-toggle [on|off]\n'
+MSG_RU[M_0203]='Режим DoT IP-whitelist (TCP 853) переключён: %s -> %s (режим наборов: %s).'
+MSG_EN[M_0203]='DoT IP whitelist mode (TCP 853) switched: %s -> %s (set mode: %s).'
+MSG_RU[M_0204]='УСПЕШНО: DoT IP-whitelist (TCP 853) переключён: %s -> %s.\n\n'
+MSG_EN[M_0204]='SUCCESS: DoT IP whitelist (TCP 853) switched: %s -> %s.\n\n'
+MSG_RU[M_0205]='ОШИБКА: Укажите режим whitelist: %s --whitelist-mode [shared|separate]\n'
+MSG_EN[M_0205]='ERROR: Specify whitelist mode: %s --whitelist-mode [shared|separate]\n'
+MSG_RU[M_0206]='Режим наборов DoT whitelist изменён: %s -> %s.'
+MSG_EN[M_0206]='DoT whitelist set mode changed: %s -> %s.'
+MSG_RU[M_0207]='УСПЕШНО: Режим наборов DoT whitelist изменён: %s -> %s.\n\n'
+MSG_EN[M_0207]='SUCCESS: DoT whitelist set mode changed: %s -> %s.\n\n'
+MSG_RU[M_0208]='Не удалось определить текущий глобальный IPv4-адрес сервера.'
+MSG_EN[M_0208]='Failed to determine current global IPv4 address of the server.'
+MSG_RU[M_0209]='Запуск синхронизации IP-адреса: старый IPv4=%s -> новый IPv4=%s (IPv6=%s)'
+MSG_EN[M_0209]='Starting IP address synchronization: old IPv4=%s -> new IPv4=%s (IPv6=%s)'
+MSG_RU[M_0210]='Предупреждение: не удалось автоматически обновить записи в Cloudflare API. Проверьте их вручную.'
+MSG_EN[M_0210]='Warning: failed to automatically update records via Cloudflare API. Please check them manually.'
+MSG_RU[M_0211]='Синхронизация нового IP (%s) успешно завершена.'
+MSG_EN[M_0211]='Synchronization of new IP (%s) completed successfully.'
+MSG_RU[M_0212]='ОШИБКА: Файлы настроек не найдены. Сначала выполните --install.\n'
+MSG_EN[M_0212]='ERROR: Settings files not found. Run --install first.\n'
+MSG_RU[M_0213]='     БЫСТРАЯ СМЕНА ДОМЕНА (С СОХРАНЕНИЕМ ПОДДОМЕНА DoT И СЕКРЕТНЫХ ПУТЕЙ)     \n'
+MSG_EN[M_0213]='     QUICK DOMAIN CHANGE (PRESERVING DoT SUBDOMAIN AND SECRET PATHS)          \n'
+MSG_RU[M_0214]='Текущий основной домен (ROOT_DOMAIN) : %s\n'
+MSG_EN[M_0214]='Current primary domain (ROOT_DOMAIN) : %s\n'
+MSG_RU[M_0215]='Текущий поддомен DoT (DOT_HOST)      : %s (префикс "%s" сохраняется)\n'
+MSG_EN[M_0215]='Current DoT subdomain (DOT_HOST)     : %s (prefix "%s" preserved)\n'
+MSG_RU[M_0216]='Секретный путь DoH (DOH_PATH)        : [СОХРАНЯЕТСЯ БЕЗ ИЗМЕНЕНИЙ, %d симв.]\n\n'
+MSG_EN[M_0216]='Secret DoH path (DOH_PATH)           : [PRESERVED UNCHANGED, %d chars]\n\n'
+MSG_RU[M_0217]='ОШИБКА: Некорректный синтаксис переданного домена: %s\n'
+MSG_EN[M_0217]='ERROR: Invalid domain syntax provided: %s\n'
+MSG_RU[M_0218]='Введите новый основной домен (ROOT_DOMAIN, например newdomain.com): '
+MSG_EN[M_0218]='Enter new primary domain (ROOT_DOMAIN, e.g. newdomain.com): '
+MSG_RU[M_0219]='ОШИБКА: Для выпуска сертификата на новый домен необходим действующий Cloudflare API Token.\n'
+MSG_EN[M_0219]='ERROR: A valid Cloudflare API Token is required to issue a certificate for the new domain.\n'
+MSG_RU[M_0220]='\nПлан смены домена:\n'
+MSG_EN[M_0220]='\nDomain change plan:\n'
+MSG_RU[M_0221]='  - Новый ROOT_DOMAIN (Сайт + DoH) : %s\n'
+MSG_EN[M_0221]='  - New ROOT_DOMAIN (Site + DoH) : %s\n'
+MSG_RU[M_0222]='  - Новый DOT_HOST (TCP 853)       : %s (префикс "%s" не изменён)\n'
+MSG_EN[M_0222]='  - New DOT_HOST (TCP 853)       : %s (prefix "%s" unchanged)\n'
+MSG_RU[M_0223]='  - Секретный путь DoH / Web-Auth  : сохраняется прежний\n'
+MSG_EN[M_0223]='  - Secret DoH / Web-Auth path   : existing path preserved\n'
+MSG_RU[M_0224]='Применить смену домена и выпустить новый сертификат? [y/N]: '
+MSG_EN[M_0224]='Apply domain change and issue new certificate? [y/N]: '
+MSG_RU[M_0225]='Операция отменена пользователем.\n'
+MSG_EN[M_0225]='Operation cancelled by user.\n'
+MSG_RU[M_0226]='Синхронизация A/AAAA записей для нового домена %s в Cloudflare...'
+MSG_EN[M_0226]='Synchronizing A/AAAA records for new domain %s in Cloudflare...'
+MSG_RU[M_0227]='Выпуск wildcard-сертификата для нового домена %s...'
+MSG_EN[M_0227]='Issuing wildcard certificate for new domain %s...'
+MSG_RU[M_0228]='Смена домена успешно завершена: %s -> %s (DoT: %s).'
+MSG_EN[M_0228]='Domain change completed successfully: %s -> %s (DoT: %s).'
+MSG_RU[M_0229]=' ДОМЕН УСПЕШНО ИЗМЕНЁН (ПОДДОМЕН DoT И СЕКРЕТНЫЙ ПУТЬ СОХРАНЕНЫ)\n'
+MSG_EN[M_0229]='  DOMAIN CHANGED SUCCESSFULLY (DoT SUBDOMAIN AND SECRET PATH PRESERVED)\n'
+MSG_RU[M_0230]='Новый DoH URL             : https://%s/resolve/%s\n'
+MSG_EN[M_0230]='New DoH URL               : https://%s/resolve/%s\n'
+MSG_RU[M_0231]='Новая ссылка авторизации  : https://%s/auth/%s\n'
+MSG_EN[M_0231]='New authorization URL     : https://%s/auth/%s\n'
+MSG_RU[M_0232]='Новый хост DoT (853/TCP)  : %s\n'
+MSG_EN[M_0232]='New DoT host (853/TCP)    : %s\n'
+MSG_RU[M_0233]='         КОМПЛЕКСНОЕ ТЕСТИРОВАНИЕ UNIFIED SMARTDNS + SNI PROXY                \n'
+MSG_EN[M_0233]='          UNIFIED SMARTDNS + SNI PROXY COMPREHENSIVE TEST SUITE               \n'
+MSG_RU[M_0234]='         Активный DNS backend: %-45s  \n'
+MSG_EN[M_0234]='          Active DNS backend: %-45s  \n'
+MSG_RU[M_0235]='Служба %s активна'
+MSG_EN[M_0235]='Service %s is active'
+MSG_RU[M_0236]='Процесс Xray работает без root (user=%s)'
+MSG_EN[M_0236]='Xray process runs without root privileges (user=%s)'
+MSG_RU[M_0237]='Сертификат SAN и SHA-256 ключей валидны'
+MSG_EN[M_0237]='Certificate SAN and SHA-256 keys are valid'
+MSG_RU[M_0238]='Обычный домен (example.com) разрешается в реальный IP (%s)'
+MSG_EN[M_0238]='Regular domain (example.com) resolves to real IP (%s)'
+MSG_RU[M_0239]='SmartDNS подменяет A-запись проксируемого домена на %s'
+MSG_EN[M_0239]='SmartDNS rewrites A-record of proxied domain to %s'
+MSG_RU[M_0240]='Обработка AAAA возвращает корректный NOERROR/NODATA'
+MSG_EN[M_0240]='AAAA handling returns valid NOERROR/NODATA'
+MSG_RU[M_0241]='Обработка HTTPS (qtype 65) возвращает пустой ответ (NOERROR/REFUSED)'
+MSG_EN[M_0241]='HTTPS (qtype 65) handling returns empty answer (NOERROR/REFUSED)'
+MSG_RU[M_0242]='Негативный тест: неверный путь DoH на %s маскируется под 404 (HTTP %s)'
+MSG_EN[M_0242]='Negative test: invalid DoH path on %s is masked as 404 (HTTP %s)'
+MSG_RU[M_0243]='Корректный DoH-запрос (A) на корневом домене %s работает'
+MSG_EN[M_0243]='Valid DoH query (A) on root domain %s works'
+MSG_RU[M_0244]='Секретная ссылка веб-авторизации /auth/ работает'
+MSG_EN[M_0244]='Secret Web-Auth link /auth/ works'
+MSG_RU[M_0245]='DoT Whitelist (ENABLED): запрещённый IPv4 блокируется firewall на 853/TCP'
+MSG_EN[M_0245]='DoT Whitelist (ENABLED): blocked IPv4 is dropped by firewall on 853/TCP'
+MSG_RU[M_0246]='DoT Whitelist (ENABLED): разрешённый IPv4 успешно подключается к 853/TCP'
+MSG_EN[M_0246]='DoT Whitelist (ENABLED): allowed IPv4 connects to 853/TCP successfully'
+MSG_RU[M_0247]='DoT Whitelist (ENABLED): неверный SNI с разрешённого IPv4 не получает сертификат'
+MSG_EN[M_0247]='DoT Whitelist (ENABLED): invalid SNI from allowed IPv4 does not receive a certificate'
+MSG_RU[M_0248]='DoT Whitelist (ENABLED): запрещённый IPv6 блокируется firewall на 853/TCP'
+MSG_EN[M_0248]='DoT Whitelist (ENABLED): blocked IPv6 is dropped by firewall on 853/TCP'
+MSG_RU[M_0249]='DoT Whitelist (ENABLED): правило разрешённого IPv6 активно в ip6tables и ipset'
+MSG_EN[M_0249]='DoT Whitelist (ENABLED): allowed IPv6 rule is active in ip6tables and ipset'
+MSG_RU[M_0250]='DoT Whitelist: автоматическое истечение TTL записи в ipset работает'
+MSG_EN[M_0250]='DoT Whitelist: automatic TTL expiration of ipset entry works'
+MSG_RU[M_0251]='DoT Whitelist: повторная авторизация обновляет TTL до 86400s (TTL=%s)'
+MSG_EN[M_0251]='DoT Whitelist: re-authorization refreshes TTL to 86400s (TTL=%s)'
+MSG_RU[M_0252]='DoT Whitelist (DISABLED): неверный SNI на 853/TCP блокируется Xray'
+MSG_EN[M_0252]='DoT Whitelist (DISABLED): invalid SNI on 853/TCP is blocked by Xray'
+MSG_RU[M_0253]='DoT Whitelist (DISABLED): подключение без IP-фильтрации с валидным DOT_HOST работает'
+MSG_EN[M_0253]='DoT Whitelist (DISABLED): connection without IP filtering using valid DOT_HOST works'
+MSG_RU[M_0254]='Сохранение настроек после перезагрузки и защита внутренних портов (включая 9444 и 8053) активны'
+MSG_EN[M_0254]='Settings persistence after reboot and internal port protection (including 9444 and 8053) are active'
+MSG_RU[M_0255]='Процедурный Cover Site доступен (HTTP 200), CSS загружается и разметка валидна'
+MSG_EN[M_0255]='Procedural Cover Site is reachable (HTTP 200), CSS loads, and markup is valid'
+MSG_RU[M_0256]='Негативный тест: повреждённый JSON блокируется проверкой xray run -test'
+MSG_EN[M_0256]='Negative test: malformed JSON is rejected by xray run -test validation'
+MSG_RU[M_0257]='Цепочки Firewall (PREROUTING/INPUT/OUTPUT) и ipset активны'
+MSG_EN[M_0257]='Firewall chains (PREROUTING/INPUT/OUTPUT) and ipset are active'
+MSG_RU[M_0258]='РЕЗУЛЬТАТ: Все проверки успешно пройдены!\n'
+MSG_EN[M_0258]='RESULT: All checks passed successfully!\n'
+MSG_RU[M_0259]='РЕЗУЛЬТАТ: Обнаружено ошибок: %d. Проверьте журналы в %s.\n'
+MSG_EN[M_0259]='RESULT: Errors detected: %d. Check logs in %s.\n'
+MSG_RU[M_0260]='\nПубличный отчёт сохранён в: %s\n'
+MSG_EN[M_0260]='\nPublic report saved to: %s\n'
+MSG_RU[M_0261]='Секретные параметры сохранены в: %s (права 0600)\n'
+MSG_EN[M_0261]='Secret parameters saved to: %s (mode 0600)\n'
+MSG_RU[M_0262]='Показать секретные ссылки DoH и /auth/ прямо сейчас в терминале? [y/N]: '
+MSG_EN[M_0262]='Display secret DoH and /auth/ URLs in the terminal right now? [y/N]: '
+MSG_RU[M_0263]='Перегенерация уникального Cover Site успешно завершена.'
+MSG_EN[M_0263]='Unique Cover Site regeneration completed successfully.'
+MSG_RU[M_0264]='=== СТАТУС СЛУЖБ SMARTDNS + SNI PROXY ===\n'
+MSG_EN[M_0264]='=== SMARTDNS + SNI PROXY SERVICES STATUS ===\n'
+MSG_RU[M_0265]='Активный DNS_ENGINE'
+MSG_EN[M_0265]='Active DNS_ENGINE'
+MSG_RU[M_0266]='ОШИБКА: Система не установлена.\n'
+MSG_EN[M_0266]='ERROR: System is not installed.\n'
+MSG_RU[M_0267]='Обновление всех компонентов, маскировки и списков успешно завершено.'
+MSG_EN[M_0267]='Update of all components, cover site, and domain lists completed successfully.'
+MSG_RU[M_0268]='ВНИМАНИЕ: Вы действительно хотите удалить стек SmartDNS + Xray? [y/N]: '
+MSG_EN[M_0268]='WARNING: Are you sure you want to uninstall the SmartDNS + Xray stack? [y/N]: '
+MSG_RU[M_0269]='Службы и правила маршрутизации отключены. Резервные копии сохранены в %s.\n'
+MSG_EN[M_0269]='Services and routing rules disabled. Backups preserved in %s.\n'
+MSG_RU[M_0270]='Запуск транзакционной установки Unified SmartDNS + SNI Proxy (%s)...'
+MSG_EN[M_0270]='Starting transactional installation of Unified SmartDNS + SNI Proxy (%s)...'
+MSG_RU[M_0271]='Синхронизация DNS-записей домена %s в Cloudflare...'
+MSG_EN[M_0271]='Synchronizing DNS records for domain %s in Cloudflare...'
+MSG_RU[M_0272]='Не удалось автоматически обновить A/AAAA записи через Cloudflare API. Проверьте их в панели Cloudflare.'
+MSG_EN[M_0272]='Failed to automatically update A/AAAA records via Cloudflare API. Please check them in the Cloudflare dashboard.'
+MSG_RU[M_0273]='Использование: ${SCRIPT_NAME} [РЕЖИМ]
+
+Доступные режимы работы:
+  --help                           Вывести эту справку
+  --preflight                      Проверка готовности сервера в режиме только чтения (без изменений)
+  --install                        Полная интерактивная транзакционная установка стека
+  --switch-engine [oxidns|adguardhome]
+                                   Транзакционное переключение DNS backend с сохранением сертификатов и OxiDNS
+  --sync-ip                        Автоматическое обновление IP сервера в локальных конфигах и Cloudflare DNS
+  --change-domain [DOM]            Быстрая смена домена и перевыпуск сертификата без смены префикса DoT и путей
+  --update                         Безопасное обновление компонентов и списков (с сохранением Cover Site)
+  --regenerate-cover               Осознанная перегенерация уникального Cover Site с резервным копированием
+  --status                         Просмотр текущего состояния служб, DNS_ENGINE и ipset
+  --test                           Запуск комплексного набора функциональных и негативных тестов
+  --backup                         Создание внеплановой резервной копии конфигураций и правил
+  --rollback                       Аварийный откат к последней рабочей резервной копии
+  --uninstall                      Корректное отключение служб и очистка правил перенаправления
+
+Управление DoT IP-whitelist (TCP 853):
+  --whitelist-status               Просмотр статуса DoT whitelist, списка разрешённых IPv4/IPv6 и их TTL
+  --whitelist-toggle [on|off]      Включить, выключить или переключить (без аргумента) IP-whitelist для DoT (TCP 853)
+  --whitelist-mode [shared|separate]
+                                   Выбрать общий (smartdns_clients) или отдельный (dot_clients) набор IP для DoT
+  --whitelist-add IP               Добавить одиночный IPv4 или IPv6 адрес в whitelist на 86400 секунд
+  --whitelist-remove IP            Удалить одиночный IPv4 или IPv6 адрес из whitelist
+  --whitelist-flush                Полностью очистить список разрешённых IP-адресов'
+MSG_EN[M_0273]='Usage: sudo ./smartdns-installer-v2.10.0-stealth.sh <COMMAND>
+
+Commands:
+  --help, -h                       Show this help message and exit
+  --preflight                      Run read-only system, network, and port preflight checks
+  --install                        Run interactive transactional installation of the full stack
+  --status                         Show active DNS engine, systemd services/timers, and ipset state
+  --test                           Run 25 functional and negative self-tests
+  --switch-engine [oxidns|adguardhome]
+                                   Transactionally switch active DNS engine on a live server
+  --regenerate-cover               Explicitly regenerate a new unique Cover Site with backup
+  --sync-ip                        Auto-detect new server IPv4/IPv6 and sync configs, firewall & Cloudflare
+  --change-domain [NEW_DOMAIN]     Change primary domain (ROOT_DOMAIN) and reissue TLS certificate
+  --update                         Safely update Xray/DNS binaries and domain lists (preserves Cover Site)
+  --backup                         Create an on-demand full backup of configs, TLS, and firewall rules
+  --rollback [PATH]                Roll back system state to the latest (or specified) backup
+  --uninstall                      Stop/disable all stack services and remove SMARTDNS_* firewall rules
+  --whitelist-status               Show DoT IP whitelist (853/TCP) status, mode, and authorized IPs
+  --whitelist-toggle [on|off]      Enable, disable, or toggle DoT IP filtering on port 853/TCP
+  --whitelist-mode [shared|separate]
+                                   Switch DoT whitelist mode between shared and isolated ipset sets
+  --whitelist-add <IP>             Manually add a single IPv4 or IPv6 address to whitelist (24h TTL)
+  --whitelist-remove <IP>          Immediately remove a single IPv4 or IPv6 address from whitelist
+  --whitelist-flush                Flush all authorized IPv4/IPv6 addresses from DoT whitelist'
+MSG_RU[M_0274]='Неизвестный параметр: %s\n'
+MSG_EN[M_0274]='Unknown option: %s\n'
+
+select_interface_language() {
+    if [[ "${SCRIPT_LANG:-}" != "ru" && "${SCRIPT_LANG:-}" != "en" ]]; then
+        SCRIPT_LANG="ru"
+    fi
+
+    local choice=""
+    while true; do
+        printf '\nВыберите язык интерфейса / Select interface language:\n\n'
+        printf '1) Русский (по умолчанию)\n'
+        printf '2) English\n\n'
+        printf 'Ваш выбор / Your choice [1]: '
+
+        if ! IFS= read -r choice; then
+            printf '\n'
+            SCRIPT_LANG="ru"
+            export SCRIPT_LANG
+            return 0
+        fi
+
+        choice="${choice//$'\r'/}"
+        choice="${choice#"${choice%%[![:space:]]*}"}"
+        choice="${choice%"${choice##*[![:space:]]}"}"
+
+        case "${choice}" in
+            ""|"1")
+                SCRIPT_LANG="ru"
+                export SCRIPT_LANG
+                return 0
+                ;;
+            "2")
+                SCRIPT_LANG="en"
+                export SCRIPT_LANG
+                return 0
+                ;;
+            *)
+                printf 'Ошибка: введите 1, 2 или нажмите Enter / Error: enter 1, 2, or press Enter.\n'
+                ;;
+        esac
+    done
+}
+
+tr_msg() {
+    local __i18n_key="$1"
+    shift || true
+    local __i18n_tpl=""
+    if [[ "${SCRIPT_LANG:-ru}" == "en" && -n "${MSG_EN[${__i18n_key}]+x}" ]]; then
+        __i18n_tpl="${MSG_EN[${__i18n_key}]}"
+    elif [[ -n "${MSG_RU[${__i18n_key}]+x}" ]]; then
+        __i18n_tpl="${MSG_RU[${__i18n_key}]}"
+    else
+        __i18n_tpl="${__i18n_key}"
+    fi
+    if [[ "$#" -gt 0 ]]; then
+        # shellcheck disable=SC2059
+        printf "${__i18n_tpl}" "$@"
+    else
+        printf '%s' "${__i18n_tpl}"
+    fi
+}
+
+printf_tr() {
+    local __i18n_key="$1"
+    shift || true
+    local __i18n_fmt=""
+    if [[ "${SCRIPT_LANG:-ru}" == "en" && -n "${MSG_EN[${__i18n_key}]+x}" ]]; then
+        __i18n_fmt="${MSG_EN[${__i18n_key}]}"
+    elif [[ -n "${MSG_RU[${__i18n_key}]+x}" ]]; then
+        __i18n_fmt="${MSG_RU[${__i18n_key}]}"
+    else
+        __i18n_fmt="${__i18n_key}"
+    fi
+    # shellcheck disable=SC2059
+    printf "${__i18n_fmt}" "$@"
+}
+
+printf_err_tr() {
+    printf_tr "$@" >&2
+}
+
+log_info_tr() {
+    local __i18n_log="$1" __i18n_key="$2"
+    shift 2 || true
+    log_info "${__i18n_log}" "$(tr_msg "${__i18n_key}" "$@")"
+}
+
+log_warn_tr() {
+    local __i18n_log="$1" __i18n_key="$2"
+    shift 2 || true
+    log_warn "${__i18n_log}" "$(tr_msg "${__i18n_key}" "$@")"
+}
+
+log_error_tr() {
+    local __i18n_log="$1" __i18n_key="$2"
+    shift 2 || true
+    log_error "${__i18n_log}" "$(tr_msg "${__i18n_key}" "$@")"
+}
+
+echo_tr() {
+    local __i18n_key="$1"
+    shift || true
+    printf '%s\n' "$(tr_msg "${__i18n_key}" "$@")"
+}
+
+echo_err_tr() {
+    local __i18n_key="$1"
+    shift || true
+    printf '%s\n' "$(tr_msg "${__i18n_key}" "$@")" >&2
+}
+
+read_tr() {
+    local __i18n_key="$1" __i18n_var="$2"
+    shift 2 || true
+    local __i18n_prompt __i18n_ans=""
+    __i18n_prompt="$(tr_msg "${__i18n_key}" "$@")"
+    IFS= read -r -p "${__i18n_prompt}" __i18n_ans || true
+    printf -v "${__i18n_var}" '%s' "${__i18n_ans}"
+}
+
 readonly LOCK_FILE="/run/lock/unified-smartdns-installer.lock"
 readonly STATE_DIR="/var/lib/oxidns-installer"
 readonly BACKUP_ROOT="${STATE_DIR}/backups"
@@ -109,9 +830,9 @@ on_error_trap() {
     if [[ "${BASH_SUBSHELL:-0}" -gt 0 ]]; then
         exit "${exit_code}"
     fi
-    log_error "installation.log" "Критическая ошибка выполнения на строке ${line_no} (код возврата: ${exit_code})."
+    log_error_tr "installation.log" "M_0001" "${line_no}" "${exit_code}"
     if [[ "${TRANSACTION_ACTIVE}" -eq 1 && -n "${CURRENT_BACKUP_DIR}" && -d "${CURRENT_BACKUP_DIR}" ]]; then
-        log_warn "rollback.log" "Обнаружена незавершённая транзакция. Запуск автоматического аварийного отката..."
+        log_warn_tr "rollback.log" "M_0002"
         perform_rollback "${CURRENT_BACKUP_DIR}" || true
     fi
     exit "${exit_code}"
@@ -126,14 +847,14 @@ acquire_lock() {
     mkdir -p "$(dirname "${LOCK_FILE}")"
     exec 9>"${LOCK_FILE}"
     if ! flock -n 9; then
-        printf 'ОШИБКА: Другой экземпляр %s уже запущен (блокировка %s).\n' "${SCRIPT_NAME}" "${LOCK_FILE}" >&2
+        printf_err_tr "M_0003" "${SCRIPT_NAME}" "${LOCK_FILE}"
         exit 1
     fi
 }
 
 check_root() {
     if [[ "${EUID}" -ne 0 ]]; then
-        printf 'ОШИБКА: Скрипт должен запускаться с привилегиями root (sudo).\n' >&2
+        printf_err_tr "M_0004"
         exit 1
     fi
 }
@@ -141,7 +862,7 @@ check_root() {
 # ------------------------------ System Discovery ------------------------------
 detect_environment() {
     if [[ ! -f /etc/os-release ]]; then
-        log_error "preflight.log" "Не найден /etc/os-release. Невозможно определить ОС."
+        log_error_tr "preflight.log" "M_0005"
         exit 1
     fi
     # shellcheck disable=SC1091
@@ -202,22 +923,22 @@ validate_os_and_resources() {
     esac
 
     if [[ "${supported}" -ne 1 ]]; then
-        log_error "preflight.log" "Несовместимая ОС: ${OS_PRETTY}. Поддерживаются только Debian 12/13 и Ubuntu 22.04/24.04 LTS."
+        log_error_tr "preflight.log" "M_0006" "${OS_PRETTY}"
         exit 1
     fi
 
     if [[ "${MEM_TOTAL_MB}" -lt 512 ]]; then
-        log_error "preflight.log" "Недостаточно оперативной памяти: ${MEM_TOTAL_MB} МБ (требуется минимум 512 МБ)."
+        log_error_tr "preflight.log" "M_0007" "${MEM_TOTAL_MB}"
         exit 1
     fi
 
     if [[ "${DISK_FREE_MB}" -lt 1500 ]]; then
-        log_error "preflight.log" "Недостаточно свободного места на диске: ${DISK_FREE_MB} МБ (требуется минимум 1500 МБ)."
+        log_error_tr "preflight.log" "M_0008" "${DISK_FREE_MB}"
         exit 1
     fi
 
     if [[ -z "${SERVER_IPV4}" ]]; then
-        log_error "preflight.log" "Не обнаружен глобальный IPv4-адрес на основном интерфейсе ${PRIMARY_IFACE}."
+        log_error_tr "preflight.log" "M_0009" "${PRIMARY_IFACE}"
         exit 1
     fi
 }
@@ -226,42 +947,42 @@ validate_os_and_resources() {
 run_preflight() {
     detect_environment
     printf '==============================================================================\n'
-    printf '               ОТЧЁТ PREFLIGHT (РЕЖИМ ТОЛЬКО ЧТЕНИЕ)                          \n'
+    printf_tr "M_0010"
     printf '==============================================================================\n'
-    printf 'ОС и версия          : %s (%s / %s)\n' "${OS_PRETTY}" "${OS_ID}" "${OS_CODENAME}"
-    printf 'Ядро Linux           : %s\n' "${KERNEL_VER}"
-    printf 'Архитектура CPU      : %s (%s ядер)\n' "${CPU_ARCH}" "${CPU_CORES}"
-    printf 'Оперативная память   : %s МБ\n' "${MEM_TOTAL_MB}"
-    printf 'Свободно на диске    : %s МБ\n' "${DISK_FREE_MB}"
-    printf 'Основной интерфейс   : %s\n' "${PRIMARY_IFACE}"
-    printf 'Публичный IPv4       : %s\n' "${SERVER_IPV4:-нет}"
-    printf 'Публичный IPv6       : %s (активен: %s)\n' "${SERVER_IPV6:-нет}" "${HAS_IPV6}"
-    printf 'Все адреса хоста     : %s\n' "${ALL_LOCAL_IPS}"
+    printf_tr "M_0011" "${OS_PRETTY}" "${OS_ID}" "${OS_CODENAME}"
+    printf_tr "M_0012" "${KERNEL_VER}"
+    printf_tr "M_0013" "${CPU_ARCH}" "${CPU_CORES}"
+    printf_tr "M_0014" "${MEM_TOTAL_MB}"
+    printf_tr "M_0015" "${DISK_FREE_MB}"
+    printf_tr "M_0016" "${PRIMARY_IFACE}"
+    printf_tr "M_0017" "${SERVER_IPV4:-нет}"
+    printf_tr "M_0018" "${SERVER_IPV6:-нет}" "${HAS_IPV6}"
+    printf_tr "M_0019" "${ALL_LOCAL_IPS}"
     printf 'Firewall backend     : %s\n' "${IPTABLES_BACKEND}"
-    printf 'Наличие Docker       : %s\n' "$( [[ "${DOCKER_PRESENT}" -eq 1 ]] && echo "Обнаружен (ВНИМАНИЕ: возможен конфликт NAT)" || echo "Не обнаружен" )"
+    printf_tr "M_0022" "$( [[ "${DOCKER_PRESENT}" -eq 1 ]] && echo "$(tr_msg M_0020)" || echo "$(tr_msg M_0021)" )"
     printf -- '------------------------------------------------------------------------------\n'
-    printf 'Состояние существующих служб:\n'
+    printf_tr "M_0023"
     for svc in nginx xray oxidns adguardhome ufw; do
         if systemctl is-active --quiet "${svc}" 2>/dev/null; then
-            printf '  - %-15s : АКТИВНА\n' "${svc}"
+            printf_tr "M_0024" "${svc}"
         else
-            printf '  - %-15s : не активна / не установлена\n' "${svc}"
+            printf_tr "M_0025" "${svc}"
         fi
     done
     printf -- '------------------------------------------------------------------------------\n'
-    printf 'Проверка совместимости с OxiDNS и AdGuardHome:\n'
+    printf_tr "M_0026"
     if [[ "${CPU_ARCH}" == "x86_64" ]]; then
-        printf '  - OxiDNS      : СОВМЕСТИМ (x86_64)\n'
+        printf_tr "M_0027"
     else
-        printf '  - OxiDNS      : НЕ СОВМЕСТИМ (официальный бинарный релиз требует x86_64)\n'
+        printf_tr "M_0028"
     fi
-    printf '  - AdGuardHome : СОВМЕСТИМ (%s)\n' "${CPU_ARCH}"
+    printf_tr "M_0029" "${CPU_ARCH}"
     printf -- '------------------------------------------------------------------------------\n'
-    printf 'Занятые сокеты (TCP/UDP):\n'
+    printf_tr "M_0030"
     ss -tulnp 2>/dev/null | sed 's/^/  /' || true
     printf '==============================================================================\n'
     validate_os_and_resources
-    printf 'ИТОГ PREFLIGHT: Сервер соответствует требованиям для развёртывания.\n'
+    printf_tr "M_0031"
 }
 
 # ------------------------------ Crypto & Validators ---------------------------
@@ -322,26 +1043,26 @@ run_interactive_wizard() {
     fi
 
     printf '\n==============================================================================\n'
-    printf '   МАСТЕР НАСТРОЙКИ UNIFIED SMARTDNS + TRANSPARENT SNI PROXY (STEALTH MODE)   \n'
+    printf_tr "M_0032"
     printf '==============================================================================\n\n'
 
-    printf 'Сравнение поддерживаемых DNS-движков:\n'
+    printf_tr "M_0033"
     printf '+------------------------+-------------------------------+-------------------------------+\n'
-    printf '| Характеристика         | 1) OxiDNS (Rust)              | 2) AdGuardHome (Go)           |\n'
+    printf_tr "M_0034"
     printf '+------------------------+-------------------------------+-------------------------------+\n'
-    printf '| Архитектура конвейера  | YAML sequence (hosts/nodata)  | DNS-правила ($dnsrewrite)     |\n'
-    printf '| Блокировка рекламы     | Нативно через geosite.dat     | Списки фильтров AdGuard       |\n'
-    printf '| Поддержка NODATA       | Нативно через hosts/reject    | Правила $dnsrewrite=NOERROR   |\n'
-    printf '| Веб-панель управления  | Отсутствует (конфиг YAML)     | Есть (локально 127.0.0.1:8053)|\n'
-    printf '| Поддержка архитектур   | Только x86_64                 | x86_64, aarch64, armv7        |\n'
+    printf_tr "M_0035"
+    printf_tr "M_0036"
+    printf_tr "M_0037"
+    printf_tr "M_0038"
+    printf_tr "M_0039"
     printf '+------------------------+-------------------------------+-------------------------------+\n\n'
 
     while true; do
-        read -r -p "Выберите DNS-движок [1 - OxiDNS, 2 - AdGuardHome] (по умолчанию 1): " engine_choice
+        read_tr "M_0040" engine_choice
         engine_choice="${engine_choice:-1}"
         if [[ "${engine_choice}" == "1" ]]; then
             if [[ "${CPU_ARCH}" != "x86_64" ]]; then
-                printf 'ОШИБКА: OxiDNS предоставляет официальную сборку только для x86_64. Ваша архитектура: %s.\n' "${CPU_ARCH}"
+                printf_tr "M_0041" "${CPU_ARCH}"
                 continue
             fi
             DNS_ENGINE="oxidns"
@@ -352,58 +1073,58 @@ run_interactive_wizard() {
             DNS_USER="adguard"
             break
         else
-            printf 'Пожалуйста, введите 1 или 2.\n'
+            printf_tr "M_0042"
         fi
     done
 
     while true; do
-        read -r -p "Введите основной домен (ROOT_DOMAIN, например example.com): " ROOT_DOMAIN
+        read_tr "M_0043" ROOT_DOMAIN
         ROOT_DOMAIN="${ROOT_DOMAIN,,}"
         if validate_domain_syntax "${ROOT_DOMAIN}"; then
             break
         fi
-        printf 'ОШИБКА: Некорректный синтаксис доменного имени.\n'
+        printf_tr "M_0044"
     done
 
     DOH_HOST="${ROOT_DOMAIN}"
-    printf 'Режим маскировки DoH       : используется корневой домен https://%s/resolve/[SECRET]\n' "${DOH_HOST}"
+    printf_tr "M_0045" "${DOH_HOST}"
 
     local default_dot_prefix
     default_dot_prefix="$(generate_random_lower 10)"
     while true; do
-        read -r -p "Введите поддомен для DoT (DOT_HOST, по умолчанию ${default_dot_prefix}.${ROOT_DOMAIN}): " DOT_HOST
+        read_tr "M_0046" DOT_HOST "${default_dot_prefix}" "${ROOT_DOMAIN}"
         DOT_HOST="${DOT_HOST:-${default_dot_prefix}.${ROOT_DOMAIN}}"
         DOT_HOST="${DOT_HOST,,}"
         if validate_domain_syntax "${DOT_HOST}" && [[ "${DOT_HOST}" == *".${ROOT_DOMAIN}" ]] && [[ "${DOT_HOST}" != "${ROOT_DOMAIN}" ]]; then
             break
         fi
-        printf 'ОШИБКА: DOT_HOST должен быть валидным поддоменом *.%s.\n' "${ROOT_DOMAIN}"
+        printf_tr "M_0047" "${ROOT_DOMAIN}"
     done
 
-    printf '\nНастройка секретного пути DoH и веб-авторизации (минимум 48 символов):\n'
-    read -r -p "Сгенерировать криптографически случайный путь автоматически? [Y/n]: " auto_doh
+    printf_tr "M_0048"
+    read_tr "M_0049" auto_doh
     auto_doh="${auto_doh:-Y}"
     if [[ "${auto_doh}" =~ ^[Yy]$ ]]; then
         DOH_PATH="$(generate_random_alnum 52)"
     else
         while true; do
-            read -r -s -p "Введите собственный секретный путь DoH (не менее 48 букв/цифр): " DOH_PATH
+            read -r -s -p "$(tr_msg M_0050)" DOH_PATH
             printf '\n'
             if [[ "${#DOH_PATH}" -ge 48 && "${DOH_PATH}" =~ ^[A-Za-z0-9]+$ ]]; then
                 break
             fi
-            printf 'ОШИБКА: Путь должен содержать минимум 48 символов (только латинские буквы и цифры).\n'
+            printf_tr "M_0051"
         done
     fi
 
-    printf '\nНастройка IP-whitelist для DNS-over-TLS (DoT, TCP 853):\n'
+    printf_tr "M_0052"
     if [[ -n "${existing_dot_wl}" ]]; then
-        printf 'Текущее сохранённое значение DOT_WHITELIST_ENABLED: %s (режим: %s)\n' "${existing_dot_wl}" "${existing_dot_mode}"
+        printf_tr "M_0053" "${existing_dot_wl}" "${existing_dot_mode}"
     fi
-    local dot_wl_prompt="Требуется ли включить предварительный whitelist IP-адресов для DoT (TCP 853)? [y/N]: "
+    local dot_wl_prompt="$(tr_msg "M_0054")"
     read -r -p "${dot_wl_prompt}" dot_wl_choice
     if [[ -z "${dot_wl_choice}" && -n "${existing_dot_wl}" ]]; then
-        read -r -p "Оставить текущее значение (${existing_dot_wl}) без изменений? [Y/n]: " keep_existing_wl
+        read_tr "M_0055" keep_existing_wl "${existing_dot_wl}"
         if [[ "${keep_existing_wl:-Y}" =~ ^[Yy]$ ]]; then
             DOT_WHITELIST_ENABLED="${existing_dot_wl}"
             DOT_WHITELIST_MODE="${existing_dot_mode:-shared}"
@@ -418,10 +1139,10 @@ run_interactive_wizard() {
     fi
 
     if [[ "${DOT_WHITELIST_ENABLED}" == "true" ]]; then
-        printf 'Выберите режим работы whitelist для DoT:\n'
-        printf '  1 — общий whitelist smartdns_clients для DoH и DoT (по умолчанию)\n'
-        printf '  2 — отдельный независимый whitelist dot_clients для DoT (с автодоступом к SNI-прокси)\n'
-        read -r -p "Режим whitelist [1/2] (по умолчанию 1): " wl_mode_choice
+        printf_tr "M_0056"
+        printf_tr "M_0057"
+        printf_tr "M_0058"
+        read_tr "M_0059" wl_mode_choice
         if [[ "${wl_mode_choice:-1}" == "2" ]]; then
             DOT_WHITELIST_MODE="separate"
         else
@@ -431,20 +1152,20 @@ run_interactive_wizard() {
         DOT_WHITELIST_MODE="${existing_dot_mode:-shared}"
     fi
 
-    printf '\nНастройка фильтра фоновых системных доменов Google/Android (EXCLUDE_GOOGLE_SYS):\n'
-    printf '  y — исключить фоновые домены (apis.google.com, *.clients.google.com и др.), сохранив generativelanguage.googleapis.com\n'
-    printf '  N — оставить все домены Google в проксируемом списке (по умолчанию N)\n'
-    read -r -p "Исключить фоновые домены Google? [y/N]: " excl_google
+    printf_tr "M_0060"
+    printf_tr "M_0061"
+    printf_tr "M_0062"
+    read_tr "M_0063" excl_google
     if [[ "${excl_google:-N}" =~ ^[Yy]$ ]]; then
         EXCLUDE_GOOGLE_SYS="y"
     else
         EXCLUDE_GOOGLE_SYS="N"
     fi
 
-    printf '\nНастройка дополнительных фильтров (INCLUDE_XBOX_IPIFY):\n'
-    printf '  y — включить домены Xbox Live в проксируемый список\n'
-    printf '  N — исключить их (по умолчанию N)\n'
-    read -r -p "Включить домены Xbox Live? [y/N]: " incl_xbox
+    printf_tr "M_0064"
+    printf_tr "M_0065"
+    printf_tr "M_0066"
+    read_tr "M_0067" incl_xbox
     if [[ "${incl_xbox:-N}" =~ ^[Yy]$ ]]; then
         INCLUDE_XBOX_IPIFY="y"
     else
@@ -458,7 +1179,7 @@ run_interactive_wizard() {
 
     while true; do
         if [[ -n "${saved_cf_token}" && "${saved_cf_token}" != "REUSE_EXISTING_CERT_TOKEN" ]]; then
-            read -r -s -p "Введите Cloudflare API Token (или нажмите Enter для использования сохранённого токена): " CF_API_TOKEN
+            read -r -s -p "$(tr_msg M_0068)" CF_API_TOKEN
             printf '\n'
             CF_API_TOKEN="${CF_API_TOKEN:-${saved_cf_token}}"
             break
@@ -468,34 +1189,34 @@ run_interactive_wizard() {
             if [[ -n "${CF_API_TOKEN}" && "${#CF_API_TOKEN}" -ge 20 ]]; then
                 break
             fi
-            printf 'ОШИБКА: API-токен Cloudflare необходим для автоматической привязки IP сервера к домену и выпуска сертификата.\n'
+            printf_tr "M_0069"
         fi
     done
 
-    read -r -p "Введите контактный email для выпуска сертификатов Let's Encrypt (по умолчанию admin@${ROOT_DOMAIN}): " ACME_EMAIL
+    read_tr "M_0070" ACME_EMAIL "${ROOT_DOMAIN}"
     ACME_EMAIL="${ACME_EMAIL:-admin@${ROOT_DOMAIN}}"
 
     printf '\n==============================================================================\n'
-    printf '                    ПОДТВЕРЖДЕНИЕ ПАРАМЕТРОВ УСТАНОВКИ                        \n'
+    printf_tr "M_0071"
     printf '==============================================================================\n'
-    printf 'Выбранный DNS-движок       : %s (системный пользователь: %s)\n' "${DNS_ENGINE}" "${DNS_USER}"
-    printf 'Основной домен (Сайт + DoH): %s (единый TLS SNI профиль)\n' "${ROOT_DOMAIN}"
-    printf 'Домен DoT                  : %s\n' "${DOT_HOST}"
-    printf 'Секретный путь DoH / Auth  : [СКРЫТО, длина %d симв.]\n' "${#DOH_PATH}"
-    printf 'DoT IP-whitelist (TCP 853) : %s (режим: %s)\n' "${DOT_WHITELIST_ENABLED}" "${DOT_WHITELIST_MODE}"
+    printf_tr "M_0072" "${DNS_ENGINE}" "${DNS_USER}"
+    printf_tr "M_0073" "${ROOT_DOMAIN}"
+    printf_tr "M_0074" "${DOT_HOST}"
+    printf_tr "M_0075" "${#DOH_PATH}"
+    printf_tr "M_0076" "${DOT_WHITELIST_ENABLED}" "${DOT_WHITELIST_MODE}"
     printf 'EXCLUDE_GOOGLE_SYS         : %s\n' "${EXCLUDE_GOOGLE_SYS}"
     printf 'INCLUDE_XBOX_IPIFY         : %s\n' "${INCLUDE_XBOX_IPIFY}"
-    printf 'Публичные порты            : 80/TCP, 443/TCP, 853/TCP\n'
-    printf 'Внутренние порты           : 8444/TCP (Xray), 9443/9444 (Nginx), 8853/TCP (DoT), 5353 (DNS), 8053 (DoH)\n'
-    printf 'План Firewall              : UFW + %s + ipset (smartdns_clients / dot_clients, TTL 86400s)\n' "${IPTABLES_BACKEND}"
+    printf_tr "M_0077"
+    printf_tr "M_0078"
+    printf_tr "M_0079" "${IPTABLES_BACKEND}"
     if [[ "${DOCKER_PRESENT}" -eq 1 ]]; then
-        printf 'ПРЕДУПРЕЖДЕНИЕ             : Обнаружен Docker. Правила PREROUTING будут вставлены перед цепочками DOCKER.\n'
+        printf_tr "M_0080"
     fi
     printf '==============================================================================\n'
 
-    read -r -p "Подтверждаете внесение изменений в конфигурацию сервера? [y/N]: " confirm_install
+    read_tr "M_0081" confirm_install
     if [[ ! "${confirm_install:-N}" =~ ^[Yy]$ ]]; then
-        printf 'Установка отменена пользователем.\n'
+        printf_tr "M_0082"
         exit 0
     fi
 }
@@ -506,7 +1227,7 @@ create_system_backup() {
     mkdir -p "${CURRENT_BACKUP_DIR}"
     chmod 0700 "${CURRENT_BACKUP_DIR}"
     install -d -m 0755 "${CURRENT_BACKUP_DIR}/fs"
-    log_info "rollback.log" "Создание полной резервной копии в ${CURRENT_BACKUP_DIR}..."
+    log_info_tr "rollback.log" "M_0083" "${CURRENT_BACKUP_DIR}"
 
     for path in /etc/nginx /etc/xray /etc/oxidns /etc/adguardhome /etc/ufw "${CERT_DIR}" "${STATE_DIR}/settings" "${DNS_ASSETS_DIR}" "${IPSET_SAVE_FILE}"; do
         if [[ -e "${path}" ]]; then
@@ -539,7 +1260,7 @@ create_system_backup() {
     fi
 
     printf '%s\n' "${CURRENT_BACKUP_DIR}" > "${STATE_DIR}/latest_backup"
-    log_info "rollback.log" "Резервная копия успешно создана: ${CURRENT_BACKUP_DIR}"
+    log_info_tr "rollback.log" "M_0084" "${CURRENT_BACKUP_DIR}"
 }
 
 perform_rollback() {
@@ -548,12 +1269,12 @@ perform_rollback() {
         target_backup="$(cat "${STATE_DIR}/latest_backup")"
     fi
     if [[ -z "${target_backup}" || ! -d "${target_backup}" ]]; then
-        log_error "rollback.log" "Не найдена директория резервной копии для отката."
+        log_error_tr "rollback.log" "M_0085"
         exit 1
     fi
 
     TRANSACTION_ACTIVE=0
-    log_warn "rollback.log" "Восстановление состояния системы из ${target_backup}..."
+    log_warn_tr "rollback.log" "M_0086" "${target_backup}"
 
     if command -v ufw >/dev/null 2>&1; then
         ufw allow OpenSSH >/dev/null 2>&1 || ufw allow 22/tcp >/dev/null 2>&1 || true
@@ -600,12 +1321,12 @@ perform_rollback() {
         fi
     done
 
-    log_info "rollback.log" "Откат из резервной копии ${target_backup} завершён (активный DNS backend: ${restored_engine})."
+    log_info_tr "rollback.log" "M_0087" "${target_backup}" "${restored_engine}"
 }
 
 # ------------------------------ Base Dependencies -----------------------------
 install_system_packages() {
-    log_info "installation.log" "Установка системных пакетов и официального репозитория Nginx..."
+    log_info_tr "installation.log" "M_0088"
     umask 022
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -y -q
@@ -643,12 +1364,12 @@ EOF
     apt-get install -y -q nginx
     umask 027
     NGINX_INSTALLED_VER="$(nginx -v 2>&1 | awk -F'/' '{print $2}')"
-    log_info "installation.log" "Установлен стабильный Nginx версии: ${NGINX_INSTALLED_VER}"
+    log_info_tr "installation.log" "M_0089" "${NGINX_INSTALLED_VER}"
 }
 
 # ------------------------------ Users & Permissions ---------------------------
 setup_users_and_dirs() {
-    log_info "installation.log" "Настройка непривилегированных пользователей, перекрёстных групп и прав доступа..."
+    log_info_tr "installation.log" "M_0090"
 
     chmod 0755 / /etc /var /var/lib /var/log /usr /usr/local /usr/local/bin /run /etc/ssl /etc/ssl/certs 2>/dev/null || true
     chmod 0644 /etc/ssl/certs/ca-certificates.crt /etc/resolv.conf 2>/dev/null || true
@@ -753,12 +1474,12 @@ install_xray_binary() {
             zip_url="https://github.com/XTLS/Xray-core/releases/download/${tag_name}/Xray-linux-arm64-v8a.zip"
             ;;
         *)
-            log_error "xray.log" "Неподдерживаемая архитектура CPU для Xray: ${CPU_ARCH}"
+            log_error_tr "xray.log" "M_0091" "${CPU_ARCH}"
             exit 1
             ;;
     esac
 
-    log_info "xray.log" "Проверка релизов Xray-core (базовый релиз: ${tag_name})..."
+    log_info_tr "xray.log" "M_0092" "${tag_name}"
     local api_json=""
     if api_json="$(curl -fsSL --retry 2 --connect-timeout 10 https://api.github.com/repos/XTLS/Xray-core/releases/latest 2>/dev/null)"; then
         local latest_tag
@@ -774,14 +1495,14 @@ install_xray_binary() {
             fi
         fi
     else
-        log_warn "xray.log" "api.github.com недоступен, используется прямая ссылка: ${zip_url}"
+        log_warn_tr "xray.log" "M_0093" "${zip_url}"
     fi
 
     local dgst_url="${zip_url}.dgst"
     local tmp_dir
     tmp_dir="$(mktemp -d /tmp/xray-install.XXXXXX)"
 
-    log_info "xray.log" "Загрузка Xray-core (${tag_name}) из ${zip_url}..."
+    log_info_tr "xray.log" "M_0094" "${tag_name}" "${zip_url}"
     curl -fsSL --retry 3 --connect-timeout 15 -o "${tmp_dir}/Xray.zip" "${zip_url}"
     curl -fsSL --retry 3 --connect-timeout 15 -o "${tmp_dir}/Xray.zip.dgst" "${dgst_url}"
 
@@ -792,7 +1513,7 @@ install_xray_binary() {
 
     if [[ -z "${expected_sha256}" || "${expected_sha256}" != "${actual_sha256}" ]]; then
         rm -rf "${tmp_dir}"
-        log_error "xray.log" "Ошибка проверки SHA-256 архива Xray! Ожидался: ${expected_sha256}, получен: ${actual_sha256}"
+        log_error_tr "xray.log" "M_0095" "${expected_sha256}" "${actual_sha256}"
         exit 1
     fi
 
@@ -809,19 +1530,19 @@ install_xray_binary() {
 
     XRAY_INSTALLED_VER="${tag_name}"
     XRAY_SOURCE_URL="${zip_url}"
-    log_info "xray.log" "Установлен и проверен Xray-core: ${ver_out} (${tag_name})"
+    log_info_tr "xray.log" "M_0096" "${ver_out}" "${tag_name}"
 }
 
 install_oxidns_binary() {
     if [[ "${CPU_ARCH}" != "x86_64" ]]; then
-        log_error "dns.log" "OxiDNS поддерживает только архитектуру x86_64. Текущая архитектура: ${CPU_ARCH}."
+        log_error_tr "dns.log" "M_0097" "${CPU_ARCH}"
         exit 1
     fi
 
     local target_ver="${OXIDNS_DEFAULT_VER}"
     local target_url="${OXIDNS_DEFAULT_URL}"
 
-    log_info "dns.log" "Проверка релизов OxiDNS в официальном репозитории ${OXIDNS_REPO}..."
+    log_info_tr "dns.log" "M_0098" "${OXIDNS_REPO}"
     local latest_json=""
     if latest_json="$(curl -fsSL --retry 2 --connect-timeout 10 https://api.github.com/repos/svenshi/oxidns/releases/latest 2>/dev/null)"; then
         local latest_tag
@@ -838,12 +1559,12 @@ install_oxidns_binary() {
 
     local tmp_dir
     tmp_dir="$(mktemp -d /tmp/oxidns-install.XXXXXX)"
-    log_info "dns.log" "Загрузка OxiDNS (${target_ver}) из ${target_url}..."
+    log_info_tr "dns.log" "M_0099" "${target_ver}" "${target_url}"
     curl -fsSL --retry 3 --connect-timeout 15 -o "${tmp_dir}/oxidns.tar.gz" "${target_url}"
 
     if ! gzip -t "${tmp_dir}/oxidns.tar.gz" 2>/dev/null; then
         rm -rf "${tmp_dir}"
-        log_error "dns.log" "Загруженный архив OxiDNS повреждён."
+        log_error_tr "dns.log" "M_0100"
         exit 1
     fi
 
@@ -852,7 +1573,7 @@ install_oxidns_binary() {
     bin_path="$(find "${tmp_dir}" -type f -name "oxidns" | sed -n '1p')"
     if [[ -z "${bin_path}" ]]; then
         rm -rf "${tmp_dir}"
-        log_error "dns.log" "В архиве OxiDNS не найден исполняемый файл oxidns."
+        log_error_tr "dns.log" "M_0101"
         exit 1
     fi
     chmod 0755 "${bin_path}"
@@ -865,11 +1586,11 @@ install_oxidns_binary() {
 
     DNS_INSTALLED_VER="${target_ver} (${actual_ver})"
     DNS_SOURCE_URL="${target_url}"
-    log_info "dns.log" "OxiDNS успешно установлен в /usr/local/bin/oxidns: ${DNS_INSTALLED_VER}"
+    log_info_tr "dns.log" "M_0102" "${DNS_INSTALLED_VER}"
 }
 
 install_adguardhome_binary() {
-    log_info "dns.log" "Получение информации о последнем стабильном релизе AdGuardHome..."
+    log_info_tr "dns.log" "M_0103"
     local api_json
     api_json="$(curl -fsSL --retry 3 --connect-timeout 10 https://api.github.com/repos/AdguardTeam/AdGuardHome/releases/latest)"
     local tag_name
@@ -877,7 +1598,7 @@ install_adguardhome_binary() {
     local pre_flag
     pre_flag="$(printf '%s' "${api_json}" | jq -r '.prerelease')"
     if [[ -z "${tag_name}" || "${tag_name}" == "null" || "${pre_flag}" != "false" ]]; then
-        log_error "dns.log" "Не удалось получить стабильный релиз AdGuardHome."
+        log_error_tr "dns.log" "M_0104"
         exit 1
     fi
 
@@ -886,7 +1607,7 @@ install_adguardhome_binary() {
         x86_64)  agh_arch="amd64" ;;
         aarch64) agh_arch="arm64" ;;
         *)
-            log_error "dns.log" "Неподдерживаемая архитектура для AdGuardHome: ${CPU_ARCH}"
+            log_error_tr "dns.log" "M_0105" "${CPU_ARCH}"
             exit 1
             ;;
     esac
@@ -899,7 +1620,7 @@ install_adguardhome_binary() {
     tar -xzf "${tmp_dir}/agh.tar.gz" -C "${tmp_dir}"
     if [[ ! -f "${tmp_dir}/AdGuardHome/AdGuardHome" ]]; then
         rm -rf "${tmp_dir}"
-        log_error "dns.log" "Не найден бинарный файл AdGuardHome после распаковки."
+        log_error_tr "dns.log" "M_0106"
         exit 1
     fi
 
@@ -912,7 +1633,7 @@ install_adguardhome_binary() {
 
     DNS_INSTALLED_VER="${tag_name} (${ver_out})"
     DNS_SOURCE_URL="${tar_url}"
-    log_info "dns.log" "AdGuardHome успешно установлен: ${DNS_INSTALLED_VER}"
+    log_info_tr "dns.log" "M_0107" "${DNS_INSTALLED_VER}"
 }
 
 record_installed_versions() {
@@ -949,16 +1670,16 @@ sync_cloudflare_dns_records() {
             if [[ -n "${CF_API_TOKEN}" && "${#CF_API_TOKEN}" -ge 20 ]]; then
                 sed -i "s|^CF_API_TOKEN=.*|CF_API_TOKEN=\"${CF_API_TOKEN}\"|" "${SECRETS_FILE}" 2>/dev/null || true
             else
-                log_error "update.log" "Некорректный Cloudflare API Token. Пропуск обновления DNS в Cloudflare."
+                log_error_tr "update.log" "M_0108"
                 return 1
             fi
         else
-            log_warn "update.log" "CF_API_TOKEN не задан в ${SECRETS_FILE}. Пропуск обновления Cloudflare API."
+            log_warn_tr "update.log" "M_0109" "${SECRETS_FILE}"
             return 1
         fi
     fi
 
-    log_info "update.log" "Получение Zone ID в Cloudflare для домена ${ROOT_DOMAIN}..."
+    log_info_tr "update.log" "M_0110" "${ROOT_DOMAIN}"
     local zone_resp
     zone_resp="$(curl -fsSL --retry 3 --connect-timeout 10 -G \
         "https://api.cloudflare.com/client/v4/zones" \
@@ -970,7 +1691,7 @@ sync_cloudflare_dns_records() {
     local zone_id
     zone_id="$(printf '%s' "${zone_resp}" | jq -r '.result[0].id // empty' 2>/dev/null || true)"
     if [[ -z "${zone_id}" ]]; then
-        log_error "update.log" "Не удалось получить Zone ID для ${ROOT_DOMAIN} через Cloudflare API. Проверьте права токена."
+        log_error_tr "update.log" "M_0111" "${ROOT_DOMAIN}"
         return 1
     fi
 
@@ -1006,9 +1727,9 @@ sync_cloudflare_dns_records() {
                 -H "Content-Type: application/json" \
                 --data "${payload}" 2>/dev/null || true)"
             if [[ "$(printf '%s' "${put_resp}" | jq -r '.success // false')" == "true" ]]; then
-                log_info "update.log" "Cloudflare DNS: обновлена запись ${rec_type} ${rec_name} -> ${rec_content} (DNS Only / proxied=false)."
+                log_info_tr "update.log" "M_0112" "${rec_type}" "${rec_name}" "${rec_content}"
             else
-                log_error "update.log" "Cloudflare DNS: ошибка обновления ${rec_type} ${rec_name}."
+                log_error_tr "update.log" "M_0113" "${rec_type}" "${rec_name}"
                 return 1
             fi
         elif [[ "${create_if_missing}" == "true" ]]; then
@@ -1019,9 +1740,9 @@ sync_cloudflare_dns_records() {
                 -H "Content-Type: application/json" \
                 --data "${payload}" 2>/dev/null || true)"
             if [[ "$(printf '%s' "${post_resp}" | jq -r '.success // false')" == "true" ]]; then
-                log_info "update.log" "Cloudflare DNS: создана запись ${rec_type} ${rec_name} -> ${rec_content} (DNS Only / proxied=false)."
+                log_info_tr "update.log" "M_0114" "${rec_type}" "${rec_name}" "${rec_content}"
             else
-                log_error "update.log" "Cloudflare DNS: ошибка создания ${rec_type} ${rec_name}."
+                log_error_tr "update.log" "M_0115" "${rec_type}" "${rec_name}"
                 return 1
             fi
         fi
@@ -1045,7 +1766,7 @@ sync_cloudflare_dns_records() {
                 "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records/${rid}" \
                 -H "Authorization: Bearer ${CF_API_TOKEN}" \
                 -H "Content-Type: application/json" >/dev/null 2>&1 || true
-            log_info "update.log" "Cloudflare DNS: удалена неактуальная запись ${rec_type} для ${rec_name} (ID: ${rid})."
+            log_info_tr "update.log" "M_0116" "${rec_type}" "${rec_name}" "${rid}"
         done
     }
 
@@ -1111,7 +1832,7 @@ EOF
 
 issue_wildcard_certificate() {
     install_tls_verification_helper
-    log_info "certificate.log" "Проверка наличия ранее выпущенного wildcard TLS-сертификата для ${ROOT_DOMAIN}..."
+    log_info_tr "certificate.log" "M_0117" "${ROOT_DOMAIN}"
 
     cat > /usr/local/bin/smartdns-cert-deploy.sh <<EOF
 #!/usr/bin/env bash
@@ -1130,7 +1851,7 @@ EOF
             chown root:ssl-smartdns "${CERT_DIR}/fullchain.pem" "${CERT_DIR}/privkey.pem"
             chmod 0644 "${CERT_DIR}/fullchain.pem"
             chmod 0640 "${CERT_DIR}/privkey.pem"
-            log_info "certificate.log" "Найден действующий проверенный сертификат в ${CERT_DIR}. Повторный выпуск не требуется."
+            log_info_tr "certificate.log" "M_0118" "${CERT_DIR}"
             return 0
         fi
     fi
@@ -1142,12 +1863,12 @@ EOF
             install -m 0640 -o root -g ssl-smartdns "${acme_ecc_dir}/${ROOT_DOMAIN}.key" "${CERT_DIR}/privkey.pem.new"
             mv -f "${CERT_DIR}/fullchain.pem.new" "${CERT_DIR}/fullchain.pem"
             mv -f "${CERT_DIR}/privkey.pem.new" "${CERT_DIR}/privkey.pem"
-            log_info "certificate.log" "Восстановлен ранее выпущенный валидный сертификат из ${acme_ecc_dir} без обращения к Let's Encrypt."
+            log_info_tr "certificate.log" "M_0119" "${acme_ecc_dir}"
             return 0
         fi
     fi
 
-    log_info "certificate.log" "Действующий сертификат не найден. Подготовка выпуска через Cloudflare DNS-01..."
+    log_info_tr "certificate.log" "M_0120"
 
     if [[ ! -x /root/.acme.sh/acme.sh ]]; then
         local tmp_acme
@@ -1168,12 +1889,12 @@ EOF
     export CF_Token="${CF_API_TOKEN}"
     /root/.acme.sh/acme.sh --home /root/.acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1 || true
 
-    log_info "certificate.log" "Запрос сертификата для SAN: ${ROOT_DOMAIN} и *.${ROOT_DOMAIN}..."
+    log_info_tr "certificate.log" "M_0121" "${ROOT_DOMAIN}" "${ROOT_DOMAIN}"
     if ! /root/.acme.sh/acme.sh --home /root/.acme.sh --issue --dns dns_cf \
         -d "${ROOT_DOMAIN}" -d "*.${ROOT_DOMAIN}" --keylength ec-256 >> "${LOG_DIR}/certificate.log" 2>&1; then
         unset CF_Token
         rm -rf "${stage_dir}"
-        log_error "certificate.log" "Не удалось выпустить сертификат через Cloudflare DNS-01. Старые сертификаты сохранены."
+        log_error_tr "certificate.log" "M_0122"
         exit 1
     fi
     unset CF_Token
@@ -1184,7 +1905,7 @@ EOF
 
     if ! /usr/local/bin/verify-tls-keys.sh "${stage_dir}/fullchain.pem" "${stage_dir}/privkey.pem" "${ROOT_DOMAIN}" >> "${LOG_DIR}/certificate.log" 2>&1; then
         rm -rf "${stage_dir}"
-        log_error "certificate.log" "Проверка ключей нового сертификата не пройдена! Отмена установки сертификата."
+        log_error_tr "certificate.log" "M_0123"
         exit 1
     fi
 
@@ -1194,12 +1915,12 @@ EOF
     mv -f "${CERT_DIR}/privkey.pem.new" "${CERT_DIR}/privkey.pem"
     rm -rf "${stage_dir}"
 
-    log_info "certificate.log" "Сертификат для ${ROOT_DOMAIN} и *.${ROOT_DOMAIN} успешно проверен и установлен."
+    log_info_tr "certificate.log" "M_0124" "${ROOT_DOMAIN}" "${ROOT_DOMAIN}"
 }
 
 # ------------------------------ GeoHideDNS & Geosite --------------------------
 install_domain_update_scripts() {
-    log_info "dns.log" "Создание скриптов обновления geosite.dat и GeoHideDNS..."
+    log_info_tr "dns.log" "M_0125"
 
     cat > /usr/local/bin/update-geosite.sh <<'EOF'
 #!/usr/bin/env bash
@@ -1524,7 +2245,7 @@ render_dns_domain_lists_from_cache() {
 
 configure_dns_engine() {
     if [[ "${DNS_ENGINE}" == "oxidns" ]]; then
-        log_info "dns.log" "Формирование и проверка конфигурации OxiDNS (/etc/oxidns/config.yaml)..."
+        log_info_tr "dns.log" "M_0126"
         install -d -m 0750 -o oxidns -g oxidns /var/lib/oxidns
 
         render_dns_domain_lists_from_cache
@@ -1610,7 +2331,7 @@ EOF
         chmod 0640 /etc/oxidns/config.yaml.tmp
         mv -f /etc/oxidns/config.yaml.tmp /etc/oxidns/config.yaml
     else
-        log_info "dns.log" "Формирование конфигурации AdGuardHome (/etc/adguardhome/AdGuardHome.yaml)..."
+        log_info_tr "dns.log" "M_0127"
         install -d -m 0750 -o adguard -g adguard /etc/adguardhome /var/lib/adguardhome
 
         render_dns_domain_lists_from_cache
@@ -1641,7 +2362,7 @@ EOF
         elif command -v htpasswd >/dev/null 2>&1; then
             agh_pass_hash="$(htpasswd -nbB "" "${AGH_ADMIN_PASS}" | cut -d: -f2)"
         else
-            log_error "dns.log" "Не найден модуль python3-bcrypt или утилита htpasswd для генерации хэша пароля AdGuardHome."
+            log_error_tr "dns.log" "M_0128"
             exit 1
         fi
 
@@ -1698,7 +2419,7 @@ EOF
 
 # ------------------------------ Xray Configuration ----------------------------
 configure_xray_base() {
-    log_info "xray.log" "Формирование базовой конфигурации Xray (/etc/xray/conf.d/00-base.json) с поддержкой PROXY protocol..."
+    log_info_tr "xray.log" "M_0129"
     install -d -m 0750 -o xray -g xray /var/log/xray
     touch /var/log/xray/access.log /var/log/xray/error.log
     chown xray:xray /var/log/xray/access.log /var/log/xray/error.log
@@ -1877,7 +2598,7 @@ validate_generated_cover_site() {
 
     for req_file in index.html 404.html favicon.svg robots.txt sitemap.xml assets/style.css assets/app.js; do
         if [[ ! -s "${stage_dir}/${req_file}" ]]; then
-            log_error "installation.log" "Проверка Cover Site не пройдена: отсутствует или пуст ${req_file}."
+            log_error_tr "installation.log" "M_0130" "${req_file}"
             return 1
         fi
     done
@@ -1887,7 +2608,7 @@ validate_generated_cover_site() {
 
     for req_tag in "<!DOCTYPE html>" "<html" "<head>" "<title>" "<body>" "<header" "<main" "<footer" "</html>"; do
         if ! grep -Fq "${req_tag}" <<<"${html_content}"; then
-            log_error "installation.log" "Проверка Cover Site не пройдена: отсутствует обязательный тег ${req_tag}."
+            log_error_tr "installation.log" "M_0131" "${req_tag}"
             return 1
         fi
     done
@@ -1895,25 +2616,25 @@ validate_generated_cover_site() {
     local section_count
     section_count="$(grep -c '<section ' <<<"${html_content}" || echo 0)"
     if [[ "${section_count}" -lt 3 ]]; then
-        log_error "installation.log" "Проверка Cover Site не пройдена: недостаточно секций (${section_count})."
+        log_error_tr "installation.log" "M_0132" "${section_count}"
         return 1
     fi
 
     # Проверка отсутствия утечек технических терминов и внутренних адресов
     if grep -Eiq '(xray|nginx|oxidns|adguard|adguardhome|telemt|smartdns|dokodemo|ipset|iptables|127\.0\.0\.1)' "${stage_dir}/index.html" "${stage_dir}/404.html" "${stage_dir}/assets/style.css" "${stage_dir}/assets/app.js"; then
-        log_error "installation.log" "Проверка безопасности Cover Site не пройдена: обнаружены технические ключевые слова."
+        log_error_tr "installation.log" "M_0133"
         return 1
     fi
 
     if [[ -n "${SERVER_IPV4:-}" ]] && grep -Fq "${SERVER_IPV4}" "${stage_dir}/index.html" "${stage_dir}/404.html"; then
-        log_error "installation.log" "Проверка безопасности Cover Site не пройдена: обнаружен IPv4 сервера в HTML."
+        log_error_tr "installation.log" "M_0134"
         return 1
     fi
 
     local new_hash
     new_hash="$(sha256sum "${stage_dir}/index.html" | awk '{print $1}')"
     if [[ -n "${prev_hash}" && "${new_hash}" == "${prev_hash}" ]]; then
-        log_warn "installation.log" "Сгенерированный index.html совпал по SHA-256 с предыдущим, требуется повторная генерация."
+        log_warn_tr "installation.log" "M_0135"
         return 2
     fi
 
@@ -2759,11 +3480,11 @@ generate_procedural_cover_site() {
     local force_regen="${2:-0}"
 
     if [[ "${force_regen}" != "1" && -s "${target_dir}/index.html" && -s "${target_dir}/assets/style.css" ]]; then
-        log_info "installation.log" "Существующий Cover Site обнаружен в ${target_dir}; повторная генерация пропущена для сохранения текущей страницы."
+        log_info_tr "installation.log" "M_0136" "${target_dir}"
         return 0
     fi
 
-    log_info "installation.log" "Запуск процедурной генерации уникального Cover Site в ${target_dir}..."
+    log_info_tr "installation.log" "M_0137" "${target_dir}"
     local prev_hash=""
     if [[ -f "${target_dir}/index.html" ]]; then
         prev_hash="$(sha256sum "${target_dir}/index.html" | awk '{print $1}')"
@@ -2791,7 +3512,7 @@ generate_procedural_cover_site() {
 
     if [[ "${valid_ok}" -ne 1 ]]; then
         rm -rf "${stage_dir}"
-        log_error "installation.log" "Не удалось сгенерировать уникальный валидный Cover Site после 5 попыток."
+        log_error_tr "installation.log" "M_0138"
         return 1
     fi
 
@@ -2812,11 +3533,11 @@ generate_procedural_cover_site() {
 ' "${final_hash}" > "${STATE_DIR}/cover-site.sha256"
         chmod 0600 "${STATE_DIR}/cover-site.sha256"
     fi
-    log_info "installation.log" "Уникальный Cover Site успешно сгенерирован и проверен (SHA-256 index.html: ${final_hash:0:16}...)."
+    log_info_tr "installation.log" "M_0139" "${final_hash:0:16}"
 }
 
 configure_nginx() {
-    log_info "installation.log" "Генерация конфигурации Nginx (9443 direct + 9444 PROXY protocol, DoH и /auth/ на ROOT_DOMAIN)..."
+    log_info_tr "installation.log" "M_0140"
     install -d -m 0750 -o www-data -g adm /var/log/nginx
     touch /var/log/nginx/doh-auth.log /var/log/nginx/dot-auth.log
     chown www-data:adm /var/log/nginx/doh-auth.log /var/log/nginx/dot-auth.log
@@ -2992,7 +3713,7 @@ EOF
 
 # ------------------------------ Dynamic Allowlist Watchers --------------------
 install_ipset_watchers() {
-    log_info "firewall.log" "Создание служб динамической авторизации IP для DoH, Web-Auth и DoT..."
+    log_info_tr "firewall.log" "M_0141"
 
     cat > /usr/local/bin/doh-ipset-watcher.sh <<'EOF'
 #!/usr/bin/env bash
@@ -3132,7 +3853,7 @@ EOF
 
 # ------------------------------ Firewall, ipset & Sysctl ----------------------
 configure_firewall_and_sysctl() {
-    log_info "firewall.log" "Настройка sysctl (TCP Keepalive + MTU Probing) и межсетевого экрана (UFW + iptables + ipset)..."
+    log_info_tr "firewall.log" "M_0142"
 
     cat > /etc/sysctl.d/90-smartdns-keepalive.conf <<'EOF'
 net.ipv4.tcp_keepalive_time = 120
@@ -3319,7 +4040,7 @@ EOF
 
     /usr/local/bin/smartdns-firewall-apply.sh
     seed_initial_admin_ip
-    log_info "firewall.log" "Правила UFW, iptables (${IPTABLES_BACKEND}) и ipset успешно применены (DoT Whitelist: ${DOT_WHITELIST_ENABLED}, режим: ${DOT_WHITELIST_MODE})."
+    log_info_tr "firewall.log" "M_0143" "${IPTABLES_BACKEND}" "${DOT_WHITELIST_ENABLED}" "${DOT_WHITELIST_MODE}"
 }
 
 seed_initial_admin_ip() {
@@ -3340,14 +4061,14 @@ seed_initial_admin_ip() {
             ipset add smartdns_clients "${admin_ip}" timeout 86400 -exist
             ipset add dot_clients "${admin_ip}" timeout 86400 -exist
             persist_ipset_state
-            log_info "firewall.log" "Автоматически добавлен IPv4 текущей SSH-сессии администратора (${admin_ip}) в smartdns_clients и dot_clients (TTL 86400s)."
+            log_info_tr "firewall.log" "M_0144" "${admin_ip}"
         fi
     elif validate_single_ipv6 "${admin_ip}"; then
         if [[ "${admin_ip}" != "::1" && ! "${admin_ip}" =~ ^fe80: && ! "${admin_ip}" =~ ^fc00: && ! "${admin_ip}" =~ ^fd00: ]]; then
             ipset add smartdns_clients6 "${admin_ip}" timeout 86400 -exist
             ipset add dot_clients6 "${admin_ip}" timeout 86400 -exist
             persist_ipset_state
-            log_info "firewall.log" "Автоматически добавлен IPv6 текущей SSH-сессии администратора (${admin_ip}) в smartdns_clients6 и dot_clients6 (TTL 86400s)."
+            log_info_tr "firewall.log" "M_0145" "${admin_ip}"
         fi
     fi
 }
@@ -3433,7 +4154,7 @@ EOF
 }
 
 install_systemd_units() {
-    log_info "installation.log" "Создание изолированных systemd units с минимальными привилегиями..."
+    log_info_tr "installation.log" "M_0146"
 
     cat > /etc/systemd/system/smartdns-firewall.service <<'EOF'
 [Unit]
@@ -3672,25 +4393,25 @@ verify_dns_backend_isolated() {
     [[ "${expected_engine}" == "adguardhome" ]] && other_engine="oxidns"
 
     printf '==============================================================================\n'
-    printf '       ИЗОЛИРОВАННОЕ ТЕСТИРОВАНИЕ DNS BACKEND: %-20s          \n' "${expected_engine}"
+    printf_tr "M_0147" "${expected_engine}"
     printf '==============================================================================\n'
 
     # 1. Service state & no port conflict
     if ! systemctl is-active --quiet "${expected_engine}"; then
-        log_error "dns.log" "Служба ${expected_engine} не активна!"
+        log_error_tr "dns.log" "M_0148" "${expected_engine}"
         return 1
     fi
     if systemctl is-active --quiet "${other_engine}" 2>/dev/null; then
-        log_error "dns.log" "Конфликт: альтернативный движок ${other_engine} всё ещё активен!"
+        log_error_tr "dns.log" "M_0149" "${other_engine}"
         return 1
     fi
-    printf '[ PASS ] Служба %s активна, конфликт с %s отсутствует\n' "${expected_engine}" "${other_engine}"
+    printf_tr "M_0150" "${expected_engine}" "${other_engine}"
 
     # 2. Listening sockets check (127.0.0.1:5353 UDP/TCP and 127.0.0.1:8053 TCP)
     if ss -ulnp | grep -q "127.0.0.1:5353 " && ss -tlnp | grep -q "127.0.0.1:5353 " && ss -tlnp | grep -q "127.0.0.1:8053 "; then
-        printf '[ PASS ] Сокеты 127.0.0.1:5353 (UDP/TCP) и 127.0.0.1:8053 (TCP DoH) прослушиваются\n'
+        printf_tr "M_0151"
     else
-        log_error "dns.log" "Не обнаружены ожидаемые сокеты 127.0.0.1:5353 / 127.0.0.1:8053 для ${expected_engine}."
+        log_error_tr "dns.log" "M_0152" "${expected_engine}"
         return 1
     fi
 
@@ -3698,16 +4419,16 @@ verify_dns_backend_isolated() {
     local upstream_ip
     upstream_ip="$(dig +time=4 +tries=2 +short @127.0.0.1 -p 5353 example.com A | sed -n '1p' || true)"
     if ! validate_single_ipv4 "${upstream_ip}" || [[ "${upstream_ip}" == "${SERVER_IPV4}" ]]; then
-        log_error "dns.log" "Ошибка разрешения обычного домена example.com через ${expected_engine} (получено: ${upstream_ip:-пусто})."
+        log_error_tr "dns.log" "M_0153" "${expected_engine}" "${upstream_ip:-пусто}"
         return 1
     fi
     local cached_ip
     cached_ip="$(dig +time=2 +tries=1 +short @127.0.0.1 -p 5353 example.com A | sed -n '1p' || true)"
     if [[ "${cached_ip}" != "${upstream_ip}" ]]; then
-        log_error "dns.log" "Ошибка повторного (кэшированного) запроса example.com."
+        log_error_tr "dns.log" "M_0154"
         return 1
     fi
-    printf '[ PASS ] Upstream DNS и кэш работают (example.com -> %s)\n' "${upstream_ip}"
+    printf_tr "M_0155" "${upstream_ip}"
 
     # 4. SmartDNS A spoofing (дожидаемся компиляции фильтров при первом запуске)
     local spoofed_ip=""
@@ -3720,24 +4441,24 @@ verify_dns_backend_isolated() {
     done
     spoofed_ip="$(dig +time=3 +tries=2 +short @127.0.0.1 -p 5353 generativelanguage.googleapis.com A | sed -n '1p' || true)"
     if [[ "${spoofed_ip}" != "${SERVER_IPV4}" ]]; then
-        log_error "dns.log" "Подмена A-записи не сработала в ${expected_engine} (ожидался ${SERVER_IPV4}, получено: ${spoofed_ip:-пусто})."
+        log_error_tr "dns.log" "M_0156" "${expected_engine}" "${SERVER_IPV4}" "${spoofed_ip:-пусто}"
         return 1
     fi
-    printf '[ PASS ] Правила SmartDNS подменяют проксируемый домен на %s\n' "${SERVER_IPV4}"
+    printf_tr "M_0157" "${SERVER_IPV4}"
 
     # 5. AAAA NODATA & HTTPS TYPE65
     local aaaa_resp https_resp
     aaaa_resp="$(dig +time=3 +tries=2 @127.0.0.1 -p 5353 generativelanguage.googleapis.com AAAA || true)"
     https_resp="$(dig +time=3 +tries=2 @127.0.0.1 -p 5353 generativelanguage.googleapis.com TYPE65 || true)"
     if ! grep -q "status: NOERROR" <<<"${aaaa_resp}" || ! grep -q "ANSWER: 0" <<<"${aaaa_resp}"; then
-        log_error "dns.log" "Некорректный ответ AAAA для проксируемого домена в ${expected_engine}."
+        log_error_tr "dns.log" "M_0158" "${expected_engine}"
         return 1
     fi
     if ! grep -Eq "status: (NOERROR|REFUSED)" <<<"${https_resp}" || ! grep -q "ANSWER: 0" <<<"${https_resp}"; then
-        log_error "dns.log" "Некорректный ответ HTTPS (TYPE65) для проксируемого домена в ${expected_engine}."
+        log_error_tr "dns.log" "M_0159" "${expected_engine}"
         return 1
     fi
-    printf '[ PASS ] Ответы AAAA (NOERROR/NODATA) и HTTPS TYPE65 (пустой ответ) валидны\n'
+    printf_tr "M_0160"
 
     # 6. Ad-blocking filter test (allow up to 10s on first AdGuardHome start while filter list initializes)
     local ad_blocked=0
@@ -3751,10 +4472,10 @@ verify_dns_backend_isolated() {
         sleep 1
     done
     if [[ "${ad_blocked}" -ne 1 ]]; then
-        log_error "dns.log" "Фильтрация рекламы (doubleclick.net) не сработала в ${expected_engine}."
+        log_error_tr "dns.log" "M_0161" "${expected_engine}"
         return 1
     fi
-    printf '[ PASS ] Фильтрация рекламных доменов (doubleclick.net) активна\n'
+    printf_tr "M_0162"
 
     # 7. Direct RFC 8484 HTTP DoH POST on 127.0.0.1:8053/dns-query
     local local_doh_check
@@ -3763,10 +4484,10 @@ verify_dns_backend_isolated() {
         -H 'Content-Type: application/dns-message' --data-binary @- \
         'http://127.0.0.1:8053/dns-query' || echo '000:none')"
     if [[ "${local_doh_check}" != "200:application/dns-message" ]]; then
-        log_error "dns.log" "Прямой DoH POST на http://127.0.0.1:8053/dns-query вернул ${local_doh_check}."
+        log_error_tr "dns.log" "M_0163" "${local_doh_check}"
         return 1
     fi
-    printf '[ PASS ] Прямой RFC 8484 HTTP DoH POST на 127.0.0.1:8053/dns-query работает (%s)\n' "${local_doh_check}"
+    printf_tr "M_0164" "${local_doh_check}"
     printf '==============================================================================\n'
     return 0
 }
@@ -3774,12 +4495,12 @@ verify_dns_backend_isolated() {
 run_switch_engine() {
     local target_engine="${1:-}"
     if [[ "${target_engine}" != "oxidns" && "${target_engine}" != "adguardhome" ]]; then
-        printf 'ОШИБКА: Укажите целевой DNS backend: %s --switch-engine [oxidns|adguardhome]\n' "${SCRIPT_NAME}" >&2
+        printf_err_tr "M_0165" "${SCRIPT_NAME}"
         exit 1
     fi
 
     if [[ ! -f "${SETTINGS_FILE}" || ! -f "${SECRETS_FILE}" ]]; then
-        printf 'ОШИБКА: Система не установлена (%s не найден).\n' "${SETTINGS_FILE}" >&2
+        printf_err_tr "M_0166" "${SETTINGS_FILE}"
         exit 1
     fi
 
@@ -3791,18 +4512,18 @@ run_switch_engine() {
 
     local previous_engine="${DNS_ENGINE}"
     if [[ "${previous_engine}" == "${target_engine}" ]] && systemctl is-active --quiet "${target_engine}"; then
-        printf 'DNS backend %s уже активен. Запуск проверок...\n' "${target_engine}"
+        printf_tr "M_0167" "${target_engine}"
         verify_dns_backend_isolated
         run_test_suite
         return 0
     fi
 
     if [[ "${target_engine}" == "oxidns" && "${CPU_ARCH}" != "x86_64" ]]; then
-        printf 'ОШИБКА: OxiDNS поддерживает только x86_64.\n' >&2
+        printf_err_tr "M_0168"
         exit 1
     fi
 
-    log_info "dns.log" "Запуск транзакционного переключения DNS backend: ${previous_engine} -> ${target_engine}..."
+    log_info_tr "dns.log" "M_0169" "${previous_engine}" "${target_engine}"
     create_system_backup
     TRANSACTION_ACTIVE=1
 
@@ -3826,7 +4547,7 @@ run_switch_engine() {
     write_dns_engine_systemd_unit
     systemctl daemon-reload
 
-    log_info "dns.log" "Остановка ${previous_engine}.service (конфигурация сохраняется) и запуск ${target_engine}.service..."
+    log_info_tr "dns.log" "M_0170" "${previous_engine}" "${target_engine}"
     systemctl disable --now "${previous_engine}.service" 2>/dev/null || true
 
     for _ in {1..10}; do
@@ -3848,7 +4569,7 @@ run_switch_engine() {
     done
 
     if [[ "${ready}" -ne 1 ]]; then
-        log_error "dns.log" "Служба ${target_engine} не открыла порты 5353/8053 в отведённое время."
+        log_error_tr "dns.log" "M_0171" "${target_engine}"
         return 1
     fi
 
@@ -3857,23 +4578,23 @@ run_switch_engine() {
     run_test_suite
 
     TRANSACTION_ACTIVE=0
-    log_info "dns.log" "Переключение DNS backend на ${target_engine} успешно завершено и проверено."
+    log_info_tr "dns.log" "M_0172" "${target_engine}"
 
     if [[ "${target_engine}" == "adguardhome" ]]; then
         # shellcheck disable=SC1091
         source "${SECRETS_FILE}"
         printf '\n==============================================================================\n'
-        printf ' УСПЕШНОЕ ПЕРЕКЛЮЧЕНИЕ НА ADGUARDHOME (СЕРТИФИКАТЫ И СЕКРЕТЫ СОХРАНЕНЫ)\n'
+        printf_tr "M_0173"
         printf '==============================================================================\n'
-        printf 'Активный DNS backend      : AdGuardHome (127.0.0.1:5353 / 127.0.0.1:8053)\n'
-        printf 'Веб-интерфейс AdGuardHome : http://127.0.0.1:8053 (доступ только через SSH-туннель)\n'
-        printf 'Логин администратора      : %s\n' "${AGH_ADMIN_USER:-см. secrets.env}"
-        printf 'Пароль администратора     : [сохранён в %s]\n' "${SECRETS_FILE}"
-        printf 'Возврат к OxiDNS          : sudo %s --switch-engine oxidns\n' "${SCRIPT_NAME}"
+        printf_tr "M_0174"
+        printf_tr "M_0175"
+        printf_tr "M_0176" "${AGH_ADMIN_USER:-см. secrets.env}"
+        printf_tr "M_0177" "${SECRETS_FILE}"
+        printf_tr "M_0178" "${SCRIPT_NAME}"
         printf '==============================================================================\n'
     else
         printf '\n==============================================================================\n'
-        printf ' УСПЕШНЫЙ ВОЗВРАТ К OXIDNS (СЕРТИФИКАТЫ И СЕКРЕТЫ СОХРАНЕНЫ)\n'
+        printf_tr "M_0179"
         printf '==============================================================================\n'
     fi
 }
@@ -3881,7 +4602,7 @@ run_switch_engine() {
 # ------------------------------ DoT Whitelist Management ----------------------
 load_whitelist_sets() {
     if [[ ! -f "${SETTINGS_FILE}" ]]; then
-        printf 'ОШИБКА: Файл настроек %s не найден. Сначала выполните --install.\n' "${SETTINGS_FILE}" >&2
+        printf_err_tr "M_0180" "${SETTINGS_FILE}"
         exit 1
     fi
     # shellcheck disable=SC1091
@@ -3908,31 +4629,31 @@ run_whitelist_status() {
     printf '==============================================================================\n'
     printf 'DoT IP-whitelist: %s\n' "${wl_banner}"
     printf 'DOT_WHITELIST_ENABLED : %s\n' "${DOT_WHITELIST_ENABLED:-false}"
-    printf 'Режим whitelist       : %s (наборы DoT: %s / %s)\n' "${DOT_WHITELIST_MODE:-shared}" "${ACTIVE_DOT_SET_V4}" "${ACTIVE_DOT_SET_V6}"
-    printf 'TTL записей           : 86400 секунд\n'
-    printf 'Файл сохранения       : %s\n' "${IPSET_SAVE_FILE}"
+    printf_tr "M_0181" "${DOT_WHITELIST_MODE:-shared}" "${ACTIVE_DOT_SET_V4}" "${ACTIVE_DOT_SET_V6}"
+    printf_tr "M_0182"
+    printf_tr "M_0183" "${IPSET_SAVE_FILE}"
     printf -- '------------------------------------------------------------------------------\n'
-    printf 'Разрешённые IPv4-адреса в %s (DoT 853/TCP) и оставшийся TTL:\n' "${ACTIVE_DOT_SET_V4}"
-    ipset list "${ACTIVE_DOT_SET_V4}" 2>/dev/null | awk '/^[0-9]/ {print "  - " $0}' || printf '  (список пуст)\n'
+    printf_tr "M_0184" "${ACTIVE_DOT_SET_V4}"
+    ipset list "${ACTIVE_DOT_SET_V4}" 2>/dev/null | awk '/^[0-9]/ {print "  - " $0}' || printf "$(tr_msg M_0185)"
     if [[ "${DOT_WHITELIST_MODE:-shared}" == "separate" ]]; then
         printf -- '------------------------------------------------------------------------------\n'
-        printf 'Разрешённые IPv4-адреса в smartdns_clients (DoH / SNI Proxy 443/TCP):\n'
-        ipset list smartdns_clients 2>/dev/null | awk '/^[0-9]/ {print "  - " $0}' || printf '  (список пуст)\n'
+        printf_tr "M_0186"
+        ipset list smartdns_clients 2>/dev/null | awk '/^[0-9]/ {print "  - " $0}' || printf "$(tr_msg M_0185)"
     fi
     printf -- '------------------------------------------------------------------------------\n'
-    printf 'Разрешённые IPv6-адреса (%s) и оставшийся TTL:\n' "${ACTIVE_DOT_SET_V6}"
-    ipset list "${ACTIVE_DOT_SET_V6}" 2>/dev/null | awk '/^[0-9a-fA-F:]/ && $0 ~ /:/ && $0 !~ /^Name|^Type|^Revision|^Header|^Size|^References|^Number|^Members/ {print "  - " $0}' || printf '  (список пуст)\n'
+    printf_tr "M_0187" "${ACTIVE_DOT_SET_V6}"
+    ipset list "${ACTIVE_DOT_SET_V6}" 2>/dev/null | awk '/^[0-9a-fA-F:]/ && $0 ~ /:/ && $0 !~ /^Name|^Type|^Revision|^Header|^Size|^References|^Number|^Members/ {print "  - " $0}' || printf "$(tr_msg M_0185)"
     printf '==============================================================================\n'
 }
 
 run_whitelist_add() {
     local target_ip="${1:-}"
     if [[ -z "${target_ip}" ]]; then
-        printf 'ОШИБКА: Укажите IPv4 или IPv6 адрес. Пример: %s --whitelist-add 203.0.113.10\n' "${SCRIPT_NAME}" >&2
+        printf_err_tr "M_0188" "${SCRIPT_NAME}"
         exit 1
     fi
     if [[ "${target_ip}" == *"/"* ]]; then
-        printf 'ОШИБКА: Добавление CIDR-диапазонов запрещено политикой безопасности. Укажите одиночный IP-адрес.\n' >&2
+        printf_err_tr "M_0189"
         exit 1
     fi
     load_whitelist_sets
@@ -3941,16 +4662,16 @@ run_whitelist_add() {
         ipset add "${ACTIVE_DOT_SET_V4}" "${target_ip}" timeout 86400 -exist
         ipset add smartdns_clients "${target_ip}" timeout 86400 -exist
         persist_ipset_state
-        log_info "firewall.log" "Вручную добавлен IPv4 ${target_ip} в ${ACTIVE_DOT_SET_V4} и smartdns_clients (TTL 86400s)."
-        printf 'УСПЕШНО: IPv4 %s добавлен в %s и smartdns_clients (TTL: 86400 сек).\n' "${target_ip}" "${ACTIVE_DOT_SET_V4}"
+        log_info_tr "firewall.log" "M_0190" "${target_ip}" "${ACTIVE_DOT_SET_V4}"
+        printf_tr "M_0191" "${target_ip}" "${ACTIVE_DOT_SET_V4}"
     elif validate_single_ipv6 "${target_ip}"; then
         ipset add "${ACTIVE_DOT_SET_V6}" "${target_ip}" timeout 86400 -exist
         ipset add smartdns_clients6 "${target_ip}" timeout 86400 -exist
         persist_ipset_state
-        log_info "firewall.log" "Вручную добавлен IPv6 ${target_ip} в ${ACTIVE_DOT_SET_V6} и smartdns_clients6 (TTL 86400s)."
-        printf 'УСПЕШНО: IPv6 %s добавлен в %s и smartdns_clients6 (TTL: 86400 сек).\n' "${target_ip}" "${ACTIVE_DOT_SET_V6}"
+        log_info_tr "firewall.log" "M_0192" "${target_ip}" "${ACTIVE_DOT_SET_V6}"
+        printf_tr "M_0193" "${target_ip}" "${ACTIVE_DOT_SET_V6}"
     else
-        printf 'ОШИБКА: Некорректный формат IPv4/IPv6 адреса: %s\n' "${target_ip}" >&2
+        printf_err_tr "M_0194" "${target_ip}"
         exit 1
     fi
 }
@@ -3958,7 +4679,7 @@ run_whitelist_add() {
 run_whitelist_remove() {
     local target_ip="${1:-}"
     if [[ -z "${target_ip}" ]]; then
-        printf 'ОШИБКА: Укажите IPv4 или IPv6 адрес для удаления.\n' >&2
+        printf_err_tr "M_0195"
         exit 1
     fi
     load_whitelist_sets
@@ -3967,16 +4688,16 @@ run_whitelist_remove() {
         ipset del "${ACTIVE_DOT_SET_V4}" "${target_ip}" -exist
         ipset del smartdns_clients "${target_ip}" -exist
         persist_ipset_state
-        log_info "firewall.log" "Удалён IPv4 ${target_ip} из ${ACTIVE_DOT_SET_V4} и smartdns_clients."
-        printf 'УСПЕШНО: IPv4 %s удалён из %s и smartdns_clients.\n' "${target_ip}" "${ACTIVE_DOT_SET_V4}"
+        log_info_tr "firewall.log" "M_0196" "${target_ip}" "${ACTIVE_DOT_SET_V4}"
+        printf_tr "M_0197" "${target_ip}" "${ACTIVE_DOT_SET_V4}"
     elif validate_single_ipv6 "${target_ip}"; then
         ipset del "${ACTIVE_DOT_SET_V6}" "${target_ip}" -exist
         ipset del smartdns_clients6 "${target_ip}" -exist
         persist_ipset_state
-        log_info "firewall.log" "Удалён IPv6 ${target_ip} из ${ACTIVE_DOT_SET_V6} и smartdns_clients6."
-        printf 'УСПЕШНО: IPv6 %s удалён из %s и smartdns_clients6.\n' "${target_ip}" "${ACTIVE_DOT_SET_V6}"
+        log_info_tr "firewall.log" "M_0198" "${target_ip}" "${ACTIVE_DOT_SET_V6}"
+        printf_tr "M_0199" "${target_ip}" "${ACTIVE_DOT_SET_V6}"
     else
-        printf 'ОШИБКА: Некорректный формат IPv4/IPv6 адреса: %s\n' "${target_ip}" >&2
+        printf_err_tr "M_0194" "${target_ip}"
         exit 1
     fi
 }
@@ -3986,14 +4707,14 @@ run_whitelist_flush() {
     ipset flush "${ACTIVE_DOT_SET_V4}"
     ipset flush "${ACTIVE_DOT_SET_V6}"
     persist_ipset_state
-    log_info "firewall.log" "Очищены списки DoT whitelist (${ACTIVE_DOT_SET_V4}, ${ACTIVE_DOT_SET_V6})."
-    printf 'УСПЕШНО: Списки %s и %s полностью очищены.\n' "${ACTIVE_DOT_SET_V4}" "${ACTIVE_DOT_SET_V6}"
+    log_info_tr "firewall.log" "M_0200" "${ACTIVE_DOT_SET_V4}" "${ACTIVE_DOT_SET_V6}"
+    printf_tr "M_0201" "${ACTIVE_DOT_SET_V4}" "${ACTIVE_DOT_SET_V6}"
 }
 
 run_whitelist_toggle() {
     local desired="${1:-toggle}"
     if [[ ! -f "${SETTINGS_FILE}" ]]; then
-        printf 'ОШИБКА: Файл настроек %s не найден. Сначала выполните --install.\n' "${SETTINGS_FILE}" >&2
+        printf_err_tr "M_0180" "${SETTINGS_FILE}"
         exit 1
     fi
     # shellcheck disable=SC1091
@@ -4017,7 +4738,7 @@ run_whitelist_toggle() {
             new_state="false"
             ;;
         *)
-            printf 'ОШИБКА: Недопустимое значение "%s". Используйте: %s --whitelist-toggle [on|off]\n' "${desired}" "${SCRIPT_NAME}" >&2
+            printf_err_tr "M_0202" "${desired}" "${SCRIPT_NAME}"
             exit 1
             ;;
     esac
@@ -4041,19 +4762,19 @@ run_whitelist_toggle() {
         seed_initial_admin_ip
     fi
 
-    log_info "firewall.log" "Режим DoT IP-whitelist (TCP 853) переключён: ${current_state} -> ${new_state} (режим наборов: ${DOT_WHITELIST_MODE:-shared})."
-    printf 'УСПЕШНО: DoT IP-whitelist (TCP 853) переключён: %s -> %s.\n\n' "${current_state}" "${new_state}"
+    log_info_tr "firewall.log" "M_0203" "${current_state}" "${new_state}" "${DOT_WHITELIST_MODE:-shared}"
+    printf_tr "M_0204" "${current_state}" "${new_state}"
     run_whitelist_status
 }
 
 run_whitelist_mode() {
     local new_mode="${1:-}"
     if [[ "${new_mode}" != "shared" && "${new_mode}" != "separate" ]]; then
-        printf 'ОШИБКА: Укажите режим whitelist: %s --whitelist-mode [shared|separate]\n' "${SCRIPT_NAME}" >&2
+        printf_err_tr "M_0205" "${SCRIPT_NAME}"
         exit 1
     fi
     if [[ ! -f "${SETTINGS_FILE}" ]]; then
-        printf 'ОШИБКА: Файл настроек %s не найден. Сначала выполните --install.\n' "${SETTINGS_FILE}" >&2
+        printf_err_tr "M_0180" "${SETTINGS_FILE}"
         exit 1
     fi
     # shellcheck disable=SC1091
@@ -4079,15 +4800,15 @@ run_whitelist_mode() {
         seed_initial_admin_ip
     fi
 
-    log_info "firewall.log" "Режим наборов DoT whitelist изменён: ${old_mode} -> ${new_mode}."
-    printf 'УСПЕШНО: Режим наборов DoT whitelist изменён: %s -> %s.\n\n' "${old_mode}" "${new_mode}"
+    log_info_tr "firewall.log" "M_0206" "${old_mode}" "${new_mode}"
+    printf_tr "M_0207" "${old_mode}" "${new_mode}"
     run_whitelist_status
 }
 
 # ------------------------------ IP Synchronization (--sync-ip) ----------------
 run_sync_ip() {
     if [[ ! -f "${SETTINGS_FILE}" ]]; then
-        printf 'ОШИБКА: Файл настроек %s не найден. Сначала выполните --install.\n' "${SETTINGS_FILE}" >&2
+        printf_err_tr "M_0180" "${SETTINGS_FILE}"
         exit 1
     fi
 
@@ -4097,7 +4818,7 @@ run_sync_ip() {
 
     detect_environment
     if [[ -z "${SERVER_IPV4}" ]]; then
-        log_error "update.log" "Не удалось определить текущий глобальный IPv4-адрес сервера."
+        log_error_tr "update.log" "M_0208"
         exit 1
     fi
 
@@ -4109,7 +4830,7 @@ run_sync_ip() {
     SERVER_IPV4="${new_ipv4}"
     SERVER_IPV6="${new_ipv6}"
 
-    log_info "update.log" "Запуск синхронизации IP-адреса: старый IPv4=${old_ipv4:-нет} -> новый IPv4=${new_ipv4} (IPv6=${new_ipv6:-нет})"
+    log_info_tr "update.log" "M_0209" "${old_ipv4:-нет}" "${new_ipv4}" "${new_ipv6:-нет}"
 
     create_system_backup
     TRANSACTION_ACTIVE=1
@@ -4120,7 +4841,7 @@ run_sync_ip() {
     sed -i "s|^PRIMARY_IFACE=.*|PRIMARY_IFACE=\"${PRIMARY_IFACE}\"|" "${SETTINGS_FILE}"
 
     if ! sync_cloudflare_dns_records "${new_ipv4}" "${new_ipv6}"; then
-        log_warn "update.log" "Предупреждение: не удалось автоматически обновить записи в Cloudflare API. Проверьте их вручную."
+        log_warn_tr "update.log" "M_0210"
     fi
 
     /usr/local/bin/update-geohide-domains.sh
@@ -4131,13 +4852,13 @@ run_sync_ip() {
 
     run_test_suite
     TRANSACTION_ACTIVE=0
-    log_info "update.log" "Синхронизация нового IP (${new_ipv4}) успешно завершена."
+    log_info_tr "update.log" "M_0211" "${new_ipv4}"
 }
 
 # ------------------------------ Fast Domain Change (--change-domain) ----------
 run_change_domain() {
     if [[ ! -f "${SETTINGS_FILE}" || ! -f "${SECRETS_FILE}" ]]; then
-        printf 'ОШИБКА: Файлы настроек не найдены. Сначала выполните --install.\n' >&2
+        printf_err_tr "M_0212"
         exit 1
     fi
 
@@ -4156,27 +4877,27 @@ run_change_domain() {
     fi
 
     printf '\n==============================================================================\n'
-    printf '     БЫСТРАЯ СМЕНА ДОМЕНА (С СОХРАНЕНИЕМ ПОДДОМЕНА DoT И СЕКРЕТНЫХ ПУТЕЙ)     \n'
+    printf_tr "M_0213"
     printf '==============================================================================\n'
-    printf 'Текущий основной домен (ROOT_DOMAIN) : %s\n' "${old_root_domain}"
-    printf 'Текущий поддомен DoT (DOT_HOST)      : %s (префикс "%s" сохраняется)\n' "${old_dot_host}" "${dot_prefix}"
-    printf 'Секретный путь DoH (DOH_PATH)        : [СОХРАНЯЕТСЯ БЕЗ ИЗМЕНЕНИЙ, %d симв.]\n\n' "${#DOH_PATH}"
+    printf_tr "M_0214" "${old_root_domain}"
+    printf_tr "M_0215" "${old_dot_host}" "${dot_prefix}"
+    printf_tr "M_0216" "${#DOH_PATH}"
 
     local new_root_domain="${1:-}"
     if [[ -n "${new_root_domain}" ]]; then
         new_root_domain="${new_root_domain,,}"
         if ! validate_domain_syntax "${new_root_domain}"; then
-            printf 'ОШИБКА: Некорректный синтаксис переданного домена: %s\n' "${new_root_domain}" >&2
+            printf_err_tr "M_0217" "${new_root_domain}"
             exit 1
         fi
     else
         while true; do
-            read -r -p "Введите новый основной домен (ROOT_DOMAIN, например newdomain.com): " new_root_domain
+            read_tr "M_0218" new_root_domain
             new_root_domain="${new_root_domain,,}"
             if validate_domain_syntax "${new_root_domain}"; then
                 break
             fi
-            printf 'ОШИБКА: Некорректный синтаксис доменного имени.\n'
+            printf_tr "M_0044"
         done
     fi
 
@@ -4191,18 +4912,18 @@ run_change_domain() {
     fi
 
     if [[ -z "${CF_API_TOKEN:-}" || "${CF_API_TOKEN}" == "REUSE_EXISTING_CERT_TOKEN" ]]; then
-        printf 'ОШИБКА: Для выпуска сертификата на новый домен необходим действующий Cloudflare API Token.\n' >&2
+        printf_err_tr "M_0219"
         exit 1
     fi
 
-    printf '\nПлан смены домена:\n'
-    printf '  - Новый ROOT_DOMAIN (Сайт + DoH) : %s\n' "${new_root_domain}"
-    printf '  - Новый DOT_HOST (TCP 853)       : %s (префикс "%s" не изменён)\n' "${new_dot_host}" "${dot_prefix}"
-    printf '  - Секретный путь DoH / Web-Auth  : сохраняется прежний\n'
+    printf_tr "M_0220"
+    printf_tr "M_0221" "${new_root_domain}"
+    printf_tr "M_0222" "${new_dot_host}" "${dot_prefix}"
+    printf_tr "M_0223"
     if [[ -t 0 ]]; then
-        read -r -p "Применить смену домена и выпустить новый сертификат? [y/N]: " confirm_dom
+        read_tr "M_0224" confirm_dom
         if [[ ! "${confirm_dom:-N}" =~ ^[Yy]$ ]]; then
-            printf 'Операция отменена пользователем.\n'
+            printf_tr "M_0225"
             exit 0
         fi
     fi
@@ -4217,10 +4938,10 @@ run_change_domain() {
 
     save_persistent_settings
 
-    log_info "update.log" "Синхронизация A/AAAA записей для нового домена ${ROOT_DOMAIN} в Cloudflare..."
+    log_info_tr "update.log" "M_0226" "${ROOT_DOMAIN}"
     sync_cloudflare_dns_records "${SERVER_IPV4}" "${SERVER_IPV6:-}" || true
 
-    log_info "certificate.log" "Выпуск wildcard-сертификата для нового домена ${ROOT_DOMAIN}..."
+    log_info_tr "certificate.log" "M_0227" "${ROOT_DOMAIN}"
     issue_wildcard_certificate
 
     sync_cover_site_domain_metadata
@@ -4238,13 +4959,13 @@ run_change_domain() {
     run_test_suite
     TRANSACTION_ACTIVE=0
 
-    log_info "update.log" "Смена домена успешно завершена: ${old_root_domain} -> ${ROOT_DOMAIN} (DoT: ${DOT_HOST})."
+    log_info_tr "update.log" "M_0228" "${old_root_domain}" "${ROOT_DOMAIN}" "${DOT_HOST}"
     printf '\n==============================================================================\n'
-    printf ' ДОМЕН УСПЕШНО ИЗМЕНЁН (ПОДДОМЕН DoT И СЕКРЕТНЫЙ ПУТЬ СОХРАНЕНЫ)\n'
+    printf_tr "M_0229"
     printf '==============================================================================\n'
-    printf 'Новый DoH URL             : https://%s/resolve/%s\n' "${ROOT_DOMAIN}" "${DOH_PATH}"
-    printf 'Новая ссылка авторизации  : https://%s/auth/%s\n' "${ROOT_DOMAIN}" "${DOH_PATH}"
-    printf 'Новый хост DoT (853/TCP)  : %s\n' "${DOT_HOST}"
+    printf_tr "M_0230" "${ROOT_DOMAIN}" "${DOH_PATH}"
+    printf_tr "M_0231" "${ROOT_DOMAIN}" "${DOH_PATH}"
+    printf_tr "M_0232" "${DOT_HOST}"
     printf '==============================================================================\n'
 }
 
@@ -4252,7 +4973,7 @@ run_change_domain() {
 run_test_suite() {
     detect_environment
     if [[ ! -f "${SETTINGS_FILE}" ]]; then
-        printf 'ОШИБКА: Файл настроек %s не найден. Сначала выполните --install.\n' "${SETTINGS_FILE}" >&2
+        printf_err_tr "M_0180" "${SETTINGS_FILE}"
         exit 1
     fi
     # shellcheck disable=SC1091
@@ -4263,8 +4984,8 @@ run_test_suite() {
 
     local failures=0
     printf '==============================================================================\n'
-    printf '         КОМПЛЕКСНОЕ ТЕСТИРОВАНИЕ UNIFIED SMARTDNS + SNI PROXY                \n'
-    printf '         Активный DNS backend: %-45s  \n' "${DNS_ENGINE}"
+    printf_tr "M_0233"
+    printf_tr "M_0234" "${DNS_ENGINE}"
     printf '==============================================================================\n'
 
     check_step() {
@@ -4281,111 +5002,111 @@ run_test_suite() {
     # 1. Service status & non-root execution
     for svc in "${DNS_ENGINE}" xray nginx doh-ipset-watcher dot-ipset-watcher; do
         if systemctl is-active --quiet "${svc}"; then
-            check_step "Служба ${svc} активна" "PASS"
+            check_step "$(tr_msg "M_0235" "${svc}")" "PASS"
         else
-            check_step "Служба ${svc} активна" "FAIL"
+            check_step "$(tr_msg "M_0235" "${svc}")" "FAIL"
         fi
     done
 
     local xray_proc_user
     xray_proc_user="$(ps -o user= -C xray | sed -n '1p' | tr -d ' ')"
-    check_step "Процесс Xray работает без root (user=${xray_proc_user})" "$( [[ "${xray_proc_user}" == "xray" ]] && echo PASS || echo FAIL )"
+    check_step "$(tr_msg "M_0236" "${xray_proc_user}")" "$( [[ "${xray_proc_user}" == "xray" ]] && echo PASS || echo FAIL )"
 
     # 2. Certificate cryptographic verification
     if /usr/local/bin/verify-tls-keys.sh "${CERT_DIR}/fullchain.pem" "${CERT_DIR}/privkey.pem" "${ROOT_DOMAIN}" >/dev/null 2>&1; then
-        check_step "Сертификат SAN и SHA-256 ключей валидны" "PASS"
+        check_step "$(tr_msg "M_0237")" "PASS"
     else
-        check_step "Сертификат SAN и SHA-256 ключей валидны" "FAIL"
+        check_step "$(tr_msg "M_0237")" "FAIL"
     fi
 
     # 3. Ordinary DNS resolution via internal listener
     local normal_a
     normal_a="$(dig +time=3 +tries=2 +short @127.0.0.1 -p 5353 example.com A || true)"
     normal_a="$(printf '%s\n' "${normal_a}" | sed -n '1p')"
-    check_step "Обычный домен (example.com) разрешается в реальный IP (${normal_a})" "$( validate_single_ipv4 "${normal_a}" && [[ "${normal_a}" != "${SERVER_IPV4}" ]] && echo PASS || echo FAIL )"
+    check_step "$(tr_msg "M_0238" "${normal_a}")" "$( validate_single_ipv4 "${normal_a}" && [[ "${normal_a}" != "${SERVER_IPV4}" ]] && echo PASS || echo FAIL )"
 
     # 4. SmartDNS A spoofing for proxied domain & subdomains
     local spoof_a
     spoof_a="$(dig +time=3 +tries=2 +short @127.0.0.1 -p 5353 generativelanguage.googleapis.com A || true)"
     spoof_a="$(printf '%s\n' "${spoof_a}" | sed -n '1p')"
-    check_step "SmartDNS подменяет A-запись проксируемого домена на ${SERVER_IPV4}" "$( [[ "${spoof_a}" == "${SERVER_IPV4}" ]] && echo PASS || echo FAIL )"
+    check_step "$(tr_msg "M_0239" "${SERVER_IPV4}")" "$( [[ "${spoof_a}" == "${SERVER_IPV4}" ]] && echo PASS || echo FAIL )"
 
     # 5. NODATA (NOERROR + empty ANSWER) for AAAA and NOERROR/REFUSED for HTTPS (TYPE65)
     local aaaa_out
     aaaa_out="$(dig +time=3 +tries=2 @127.0.0.1 -p 5353 generativelanguage.googleapis.com AAAA || true)"
     if grep -q "status: NOERROR" <<<"${aaaa_out}" && grep -q "ANSWER: 0" <<<"${aaaa_out}"; then
-        check_step "Обработка AAAA возвращает корректный NOERROR/NODATA" "PASS"
+        check_step "$(tr_msg "M_0240")" "PASS"
     else
-        check_step "Обработка AAAA возвращает корректный NOERROR/NODATA" "FAIL"
+        check_step "$(tr_msg "M_0240")" "FAIL"
     fi
 
     local https_out
     https_out="$(dig +time=3 +tries=2 @127.0.0.1 -p 5353 generativelanguage.googleapis.com TYPE65 || true)"
     if grep -Eq "status: (NOERROR|REFUSED)" <<<"${https_out}" && grep -q "ANSWER: 0" <<<"${https_out}"; then
-        check_step "Обработка HTTPS (qtype 65) возвращает пустой ответ (NOERROR/REFUSED)" "PASS"
+        check_step "$(tr_msg "M_0241")" "PASS"
     else
-        check_step "Обработка HTTPS (qtype 65) возвращает пустой ответ (NOERROR/REFUSED)" "FAIL"
+        check_step "$(tr_msg "M_0241")" "FAIL"
     fi
 
     # 6. Negative Test: Wrong DoH path on ROOT_DOMAIN returns disguised 404
     local wrong_doh_code
     wrong_doh_code="$(curl -sk -o /dev/null -w '%{http_code}' --resolve "${ROOT_DOMAIN}:9443:127.0.0.1" "https://${ROOT_DOMAIN}:9443/resolve/wrongpath12345" || echo 000)"
-    check_step "Негативный тест: неверный путь DoH на ${ROOT_DOMAIN} маскируется под 404 (HTTP ${wrong_doh_code})" "$( [[ "${wrong_doh_code}" == "404" ]] && echo PASS || echo FAIL )"
+    check_step "$(tr_msg "M_0242" "${ROOT_DOMAIN}" "${wrong_doh_code}")" "$( [[ "${wrong_doh_code}" == "404" ]] && echo PASS || echo FAIL )"
 
     # 7. Valid DoH RFC 8484 query on ROOT_DOMAIN
     local valid_doh_ctype
     valid_doh_ctype="$(curl -sk -o /dev/null -w '%{content_type}' --resolve "${ROOT_DOMAIN}:9443:127.0.0.1" \
         "https://${ROOT_DOMAIN}:9443/resolve/${DOH_PATH}?dns=AAABAAABAAAAAAAAB2V4YW1wbGUDY29tAAABAAE" || true)"
-    check_step "Корректный DoH-запрос (A) на корневом домене ${ROOT_DOMAIN} работает" "$( [[ "${valid_doh_ctype}" == "application/dns-message" ]] && echo PASS || echo FAIL )"
+    check_step "$(tr_msg "M_0243" "${ROOT_DOMAIN}")" "$( [[ "${valid_doh_ctype}" == "application/dns-message" ]] && echo PASS || echo FAIL )"
 
     # 8. Web-Auth bookmark endpoint check
     local web_auth_check
     web_auth_check="$(curl -sk --resolve "${ROOT_DOMAIN}:9443:127.0.0.1" "https://${ROOT_DOMAIN}:9443/auth/${DOH_PATH}" || true)"
-    check_step "Секретная ссылка веб-авторизации /auth/ работает" "$( grep -q "Session Synchronized" <<<"${web_auth_check}" && echo PASS || echo FAIL )"
+    check_step "$(tr_msg "M_0244")" "$( grep -q "Session Synchronized" <<<"${web_auth_check}" && echo PASS || echo FAIL )"
 
     # 9. DoT IPv4/IPv6 Whitelist, TTL Expiration, Re-auth, and Wrong SNI Checks
     if [[ "${DOT_WHITELIST_ENABLED:-false}" == "true" ]]; then
         ipset del "${ACTIVE_DOT_SET_V4}" 127.0.0.2 -exist
         if ! timeout 2 openssl s_client -connect 127.0.0.2:853 -servername "${DOT_HOST}" </dev/null 2>/dev/null | grep -q "BEGIN CERTIFICATE"; then
-            check_step "DoT Whitelist (ENABLED): запрещённый IPv4 блокируется firewall на 853/TCP" "PASS"
+            check_step "$(tr_msg "M_0245")" "PASS"
         else
-            check_step "DoT Whitelist (ENABLED): запрещённый IPv4 блокируется firewall на 853/TCP" "FAIL"
+            check_step "$(tr_msg "M_0245")" "FAIL"
         fi
 
         ipset add "${ACTIVE_DOT_SET_V4}" 127.0.0.1 timeout 86400 -exist
         if timeout 4 openssl s_client -connect 127.0.0.1:853 -servername "${DOT_HOST}" </dev/null 2>/dev/null | grep -q "BEGIN CERTIFICATE"; then
-            check_step "DoT Whitelist (ENABLED): разрешённый IPv4 успешно подключается к 853/TCP" "PASS"
+            check_step "$(tr_msg "M_0246")" "PASS"
         else
-            check_step "DoT Whitelist (ENABLED): разрешённый IPv4 успешно подключается к 853/TCP" "FAIL"
+            check_step "$(tr_msg "M_0246")" "FAIL"
         fi
 
         if ! timeout 3 openssl s_client -connect 127.0.0.1:853 -servername "invalid.sni.${ROOT_DOMAIN}" </dev/null 2>/dev/null | grep -q "BEGIN CERTIFICATE"; then
-            check_step "DoT Whitelist (ENABLED): неверный SNI с разрешённого IPv4 не получает сертификат" "PASS"
+            check_step "$(tr_msg "M_0247")" "PASS"
         else
-            check_step "DoT Whitelist (ENABLED): неверный SNI с разрешённого IPv4 не получает сертификат" "FAIL"
+            check_step "$(tr_msg "M_0247")" "FAIL"
         fi
 
         ipset del "${ACTIVE_DOT_SET_V6}" ::1 -exist
         if ! timeout 2 openssl s_client -6 -connect "[::1]:853" -servername "${DOT_HOST}" </dev/null 2>/dev/null | grep -q "BEGIN CERTIFICATE"; then
-            check_step "DoT Whitelist (ENABLED): запрещённый IPv6 блокируется firewall на 853/TCP" "PASS"
+            check_step "$(tr_msg "M_0248")" "PASS"
         else
-            check_step "DoT Whitelist (ENABLED): запрещённый IPv6 блокируется firewall на 853/TCP" "FAIL"
+            check_step "$(tr_msg "M_0248")" "FAIL"
         fi
 
         ipset add "${ACTIVE_DOT_SET_V6}" ::1 timeout 86400 -exist
         if ipset test "${ACTIVE_DOT_SET_V6}" ::1 >/dev/null 2>&1 && ip6tables -t filter -C SMARTDNS6_INPUT -p tcp --dport 853 -m set --match-set "${ACTIVE_DOT_SET_V6}" src -m hashlimit --hashlimit-name dot_v6_rate --hashlimit-mode srcip --hashlimit-upto 30/min --hashlimit-burst 40 -j ACCEPT 2>/dev/null; then
-            check_step "DoT Whitelist (ENABLED): правило разрешённого IPv6 активно в ip6tables и ipset" "PASS"
+            check_step "$(tr_msg "M_0249")" "PASS"
         else
-            check_step "DoT Whitelist (ENABLED): правило разрешённого IPv6 активно в ip6tables и ipset" "FAIL"
+            check_step "$(tr_msg "M_0249")" "FAIL"
         fi
         ipset del "${ACTIVE_DOT_SET_V6}" ::1 -exist
 
         ipset add "${ACTIVE_DOT_SET_V4}" 198.51.100.250 timeout 2 -exist
         sleep 3
         if ! ipset test "${ACTIVE_DOT_SET_V4}" 198.51.100.250 >/dev/null 2>&1; then
-            check_step "DoT Whitelist: автоматическое истечение TTL записи в ipset работает" "PASS"
+            check_step "$(tr_msg "M_0250")" "PASS"
         else
-            check_step "DoT Whitelist: автоматическое истечение TTL записи в ipset работает" "FAIL"
+            check_step "$(tr_msg "M_0250")" "FAIL"
         fi
 
         ipset add "${ACTIVE_DOT_SET_V4}" 198.51.100.250 timeout 100 -exist
@@ -4394,27 +5115,27 @@ run_test_suite() {
         refreshed_ttl="$(ipset list "${ACTIVE_DOT_SET_V4}" | awk '$1 == "198.51.100.250" {print $3}')"
         ipset del "${ACTIVE_DOT_SET_V4}" 198.51.100.250 -exist
         ipset del "${ACTIVE_DOT_SET_V4}" 127.0.0.1 -exist
-        check_step "DoT Whitelist: повторная авторизация обновляет TTL до 86400s (TTL=${refreshed_ttl:-0})" "$( [[ "${refreshed_ttl:-0}" -gt 86000 ]] && echo PASS || echo FAIL )"
+        check_step "$(tr_msg "M_0251" "${refreshed_ttl:-0}")" "$( [[ "${refreshed_ttl:-0}" -gt 86000 ]] && echo PASS || echo FAIL )"
     else
         ipset del "${ACTIVE_DOT_SET_V4}" 127.0.0.1 -exist
         if ! timeout 3 openssl s_client -connect 127.0.0.1:853 -servername "invalid.sni.${ROOT_DOMAIN}" </dev/null 2>/dev/null | grep -q "BEGIN CERTIFICATE"; then
-            check_step "DoT Whitelist (DISABLED): неверный SNI на 853/TCP блокируется Xray" "PASS"
+            check_step "$(tr_msg "M_0252")" "PASS"
         else
-            check_step "DoT Whitelist (DISABLED): неверный SNI на 853/TCP блокируется Xray" "FAIL"
+            check_step "$(tr_msg "M_0252")" "FAIL"
         fi
 
         if timeout 5 openssl s_client -connect 127.0.0.1:853 -servername "${DOT_HOST}" </dev/null 2>/dev/null | grep -q "BEGIN CERTIFICATE"; then
-            check_step "DoT Whitelist (DISABLED): подключение без IP-фильтрации с валидным DOT_HOST работает" "PASS"
+            check_step "$(tr_msg "M_0253")" "PASS"
         else
-            check_step "DoT Whitelist (DISABLED): подключение без IP-фильтрации с валидным DOT_HOST работает" "FAIL"
+            check_step "$(tr_msg "M_0253")" "FAIL"
         fi
     fi
 
     # 10. Persistence & Internal Ports Protection Check
     if systemctl is-enabled --quiet smartdns-firewall.service && [[ -f "${IPSET_SAVE_FILE}" ]] && iptables -t filter -C SMARTDNS_INPUT -p tcp -m multiport --dports 8443,9444,8853,5353,8053,3000 -j DROP 2>/dev/null; then
-        check_step "Сохранение настроек после перезагрузки и защита внутренних портов (включая 9444 и 8053) активны" "PASS"
+        check_step "$(tr_msg "M_0254")" "PASS"
     else
-        check_step "Сохранение настроек после перезагрузки и защита внутренних портов (включая 9444 и 8053) активны" "FAIL"
+        check_step "$(tr_msg "M_0254")" "FAIL"
     fi
 
     # 11. Procedural Cover Site availability & structural integrity check
@@ -4423,34 +5144,34 @@ run_test_suite() {
     site_html="$(curl -sk --resolve "${ROOT_DOMAIN}:9443:127.0.0.1" "https://${ROOT_DOMAIN}:9443/" || true)"
     css_code="$(curl -sk -o /dev/null -w '%{http_code}' --resolve "${ROOT_DOMAIN}:9443:127.0.0.1" "https://${ROOT_DOMAIN}:9443/assets/style.css" || echo 000)"
     if [[ "${site_code}" == "200" && "${css_code}" == "200" ]] && grep -Fq "<!DOCTYPE html>" <<<"${site_html}" && grep -Fq "<main>" <<<"${site_html}" && grep -Fq "<footer" <<<"${site_html}"; then
-        check_step "Процедурный Cover Site доступен (HTTP 200), CSS загружается и разметка валидна" "PASS"
+        check_step "$(tr_msg "M_0255")" "PASS"
     else
-        check_step "Процедурный Cover Site доступен (HTTP 200), CSS загружается и разметка валидна" "FAIL"
+        check_step "$(tr_msg "M_0255")" "FAIL"
     fi
 
     # 12. Negative Test: Damaged JSON rejected by xray-safe-reload
     local tmp_bad="/tmp/bad-routing.json"
     printf '{ "routing": INVALID_JSON }' > "${tmp_bad}"
     if ! /usr/local/bin/xray run -test -config "${XRAY_CONF_DIR}/00-base.json" -config "${tmp_bad}" >/dev/null 2>&1; then
-        check_step "Негативный тест: повреждённый JSON блокируется проверкой xray run -test" "PASS"
+        check_step "$(tr_msg "M_0256")" "PASS"
     else
-        check_step "Негативный тест: повреждённый JSON блокируется проверкой xray run -test" "FAIL"
+        check_step "$(tr_msg "M_0256")" "FAIL"
     fi
     rm -f "${tmp_bad}"
 
     # 13. Firewall & ipset status check
     if ipset list smartdns_clients >/dev/null 2>&1 && iptables -t nat -C PREROUTING -j SMARTDNS_PREROUTING 2>/dev/null; then
-        check_step "Цепочки Firewall (PREROUTING/INPUT/OUTPUT) и ipset активны" "PASS"
+        check_step "$(tr_msg "M_0257")" "PASS"
     else
-        check_step "Цепочки Firewall (PREROUTING/INPUT/OUTPUT) и ipset активны" "FAIL"
+        check_step "$(tr_msg "M_0257")" "FAIL"
     fi
 
     printf '==============================================================================\n'
     if [[ "${failures}" -eq 0 ]]; then
-        printf 'РЕЗУЛЬТАТ: Все проверки успешно пройдены!\n'
+        printf_tr "M_0258"
         return 0
     else
-        printf 'РЕЗУЛЬТАТ: Обнаружено ошибок: %d. Проверьте журналы в %s.\n' "${failures}" "${LOG_DIR}"
+        printf_tr "M_0259" "${failures}" "${LOG_DIR}"
         return 1
     fi
 }
@@ -4578,10 +5299,10 @@ EOF
     chmod 0600 "${secret_report_file}"
 
     cat "${report_file}"
-    printf '\nПубличный отчёт сохранён в: %s\n' "${report_file}"
-    printf 'Секретные параметры сохранены в: %s (права 0600)\n' "${secret_report_file}"
+    printf_tr "M_0260" "${report_file}"
+    printf_tr "M_0261" "${secret_report_file}"
 
-    read -r -p "Показать секретные ссылки DoH и /auth/ прямо сейчас в терминале? [y/N]: " show_sec
+    read_tr "M_0262" show_sec
     if [[ "${show_sec:-N}" =~ ^[Yy]$ ]]; then
         cat "${secret_report_file}"
     fi
@@ -4590,7 +5311,7 @@ EOF
 run_regenerate_cover() {
     detect_environment
     if [[ ! -f "${SETTINGS_FILE}" ]]; then
-        printf 'ОШИБКА: Файл настроек %s не найден. Сначала выполните --install.\n' "${SETTINGS_FILE}" >&2
+        printf_err_tr "M_0180" "${SETTINGS_FILE}"
         exit 1
     fi
     # shellcheck disable=SC1091
@@ -4602,15 +5323,15 @@ run_regenerate_cover() {
     nginx -t && systemctl reload nginx
     run_test_suite
     TRANSACTION_ACTIVE=0
-    log_info "installation.log" "Перегенерация уникального Cover Site успешно завершена."
+    log_info_tr "installation.log" "M_0263"
 }
 
 # ------------------------------ Status / Update / Uninstall -------------------
 run_status() {
     detect_environment
-    printf '=== СТАТУС СЛУЖБ SMARTDNS + SNI PROXY ===\n'
+    printf_tr "M_0264"
     if [[ -f "${SETTINGS_FILE}" ]]; then
-        printf '  %-26s : %s\n' "Активный DNS_ENGINE" "$(awk -F'"' '/^DNS_ENGINE=/ {print $2}' "${SETTINGS_FILE}" 2>/dev/null || echo unknown)"
+        printf '  %-26s : %s\n' "$(tr_msg M_0265)" "$(awk -F'"' '/^DNS_ENGINE=/ {print $2}' "${SETTINGS_FILE}" 2>/dev/null || echo unknown)"
     fi
     for svc in smartdns-firewall oxidns adguardhome xray xray-reload.path nginx doh-ipset-watcher dot-ipset-watcher geosite-update.timer geohide-update.timer; do
         if systemctl list-unit-files "${svc}*" >/dev/null 2>&1; then
@@ -4626,7 +5347,7 @@ run_status() {
 run_update() {
     detect_environment
     if [[ ! -f "${SETTINGS_FILE}" ]]; then
-        printf 'ОШИБКА: Система не установлена.\n' >&2
+        printf_err_tr "M_0266"
         exit 1
     fi
     # shellcheck disable=SC1091
@@ -4660,11 +5381,11 @@ run_update() {
     verify_dns_backend_isolated
     run_test_suite
     TRANSACTION_ACTIVE=0
-    log_info "update.log" "Обновление всех компонентов, маскировки и списков успешно завершено."
+    log_info_tr "update.log" "M_0267"
 }
 
 run_uninstall() {
-    read -r -p "ВНИМАНИЕ: Вы действительно хотите удалить стек SmartDNS + Xray? [y/N]: " confirm_uninst
+    read_tr "M_0268" confirm_uninst
     if [[ ! "${confirm_uninst:-N}" =~ ^[Yy]$ ]]; then
         exit 0
     fi
@@ -4677,7 +5398,7 @@ run_uninstall() {
     ip6tables -t nat -D PREROUTING -j SMARTDNS6_PREROUTING 2>/dev/null || true
     ip6tables -t filter -D INPUT -j SMARTDNS6_INPUT 2>/dev/null || true
     ip6tables -t filter -D OUTPUT -j SMARTDNS6_OUTPUT 2>/dev/null || true
-    printf 'Службы и правила маршрутизации отключены. Резервные копии сохранены в %s.\n' "${BACKUP_ROOT}"
+    printf_tr "M_0269" "${BACKUP_ROOT}"
 }
 
 # ------------------------------ Full Installation Flow ------------------------
@@ -4687,7 +5408,7 @@ run_install() {
     run_interactive_wizard
 
     init_logging
-    log_info "installation.log" "Запуск транзакционной установки Unified SmartDNS + SNI Proxy (${INSTALLER_VERSION})..."
+    log_info_tr "installation.log" "M_0270" "${INSTALLER_VERSION}"
 
     setup_users_and_dirs
     create_system_backup
@@ -4703,9 +5424,9 @@ run_install() {
     fi
     record_installed_versions
 
-    log_info "installation.log" "Синхронизация DNS-записей домена ${ROOT_DOMAIN} в Cloudflare..."
+    log_info_tr "installation.log" "M_0271" "${ROOT_DOMAIN}"
     if ! sync_cloudflare_dns_records "${SERVER_IPV4}" "${SERVER_IPV6:-}"; then
-        log_warn "installation.log" "Не удалось автоматически обновить A/AAAA записи через Cloudflare API. Проверьте их в панели Cloudflare."
+        log_warn_tr "installation.log" "M_0272"
     fi
 
     issue_wildcard_certificate
@@ -4729,37 +5450,11 @@ run_install() {
 
 # ------------------------------ CLI Argument Parser ---------------------------
 print_help() {
-    cat <<EOF
-Использование: ${SCRIPT_NAME} [РЕЖИМ]
-
-Доступные режимы работы:
-  --help                           Вывести эту справку
-  --preflight                      Проверка готовности сервера в режиме только чтения (без изменений)
-  --install                        Полная интерактивная транзакционная установка стека
-  --switch-engine [oxidns|adguardhome]
-                                   Транзакционное переключение DNS backend с сохранением сертификатов и OxiDNS
-  --sync-ip                        Автоматическое обновление IP сервера в локальных конфигах и Cloudflare DNS
-  --change-domain [DOM]            Быстрая смена домена и перевыпуск сертификата без смены префикса DoT и путей
-  --update                         Безопасное обновление компонентов и списков (с сохранением Cover Site)
-  --regenerate-cover               Осознанная перегенерация уникального Cover Site с резервным копированием
-  --status                         Просмотр текущего состояния служб, DNS_ENGINE и ipset
-  --test                           Запуск комплексного набора функциональных и негативных тестов
-  --backup                         Создание внеплановой резервной копии конфигураций и правил
-  --rollback                       Аварийный откат к последней рабочей резервной копии
-  --uninstall                      Корректное отключение служб и очистка правил перенаправления
-
-Управление DoT IP-whitelist (TCP 853):
-  --whitelist-status               Просмотр статуса DoT whitelist, списка разрешённых IPv4/IPv6 и их TTL
-  --whitelist-toggle [on|off]      Включить, выключить или переключить (без аргумента) IP-whitelist для DoT (TCP 853)
-  --whitelist-mode [shared|separate]
-                                   Выбрать общий (smartdns_clients) или отдельный (dot_clients) набор IP для DoT
-  --whitelist-add IP               Добавить одиночный IPv4 или IPv6 адрес в whitelist на 86400 секунд
-  --whitelist-remove IP            Удалить одиночный IPv4 или IPv6 адрес из whitelist
-  --whitelist-flush                Полностью очистить список разрешённых IP-адресов
-EOF
+    printf '%s\n' "$(tr_msg "M_0273")"
 }
 
 main() {
+    select_interface_language
     if [[ $# -eq 0 ]]; then
         print_help
         exit 0
@@ -4888,7 +5583,7 @@ main() {
             run_whitelist_flush
             ;;
         *)
-            printf 'Неизвестный параметр: %s\n' "$1" >&2
+            printf_err_tr "M_0274" "$1"
             print_help
             exit 1
             ;;
