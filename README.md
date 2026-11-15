@@ -146,7 +146,7 @@
 
 1. **Скачайте скрипт и выдайте права на выполнение:**
    ```bash
-   curl -fsSL [https://raw.githubusercontent.com/EvgenyElizarenko/smartdns-installer/v2.10.0-stealth/smartdns-installer-v2.10.0-stealth.sh](https://raw.githubusercontent.com/EvgenyElizarenko/smartdns-installer/v2.10.0-stealth/smartdns-installer-v2.10.0-stealth.sh) -o smartdns-installer.sh
+   curl -fsSL "https://raw.githubusercontent.com/EvgenyElizarenko/smartdns-installer/refs/heads/main/smartdns-installer-v2.10.0-stealth.sh" -o smartdns-installer.sh
    chmod +x smartdns-installer.sh
    ```
 
@@ -241,7 +241,7 @@
 * **Неинтерактивный запуск в автоматизации:**
   Для вызова команд из `cron` или `systemd` без ожидания ввода языка передавайте переменную `SCRIPT_LANG`:
   ```bash
-  sudo SCRIPT_LANG=en /home/omega/unified-smartdns-installer.sh --update </dev/null
+  sudo SCRIPT_LANG=en /<user_home_folder>/smartdns-installer.sh --update </dev/null
   ```
 
 ---
@@ -255,7 +255,9 @@
 В ряде подсетей зарубежных хостинг-провайдеров возможна фильтрация трафика по IP-адресу или сигнатурам TLS со стороны ТСПУ (особенно при использовании подсетей, ранее задействованных под массовые VPN-сервисы, или при попытке подключения с включённым ECH). Проверьте прямую доступность Cover Site на порту `443/TCP` с компьютера в РФ в обход системного DNS:
 
 ```bash
-curl -vk --max-time 6 --resolve "example.com:443:<server_ip>" [https://example.com/](https://example.com/)
+curl -vk --max-time 6 \
+  --resolve "example.com:443:<server_ip>" \
+  "https://example.com/"
 ```
 *(Замените `example.com` на ваш `ROOT_DOMAIN`, а `<server_ip>` — на публичный IPv4-адрес сервера.)*
 

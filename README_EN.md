@@ -146,7 +146,7 @@ On every interactive launch, the script prompts for the user interface language 
 
 1. **Download the script and make it executable:**
    ```bash
-   curl -fsSL [https://raw.githubusercontent.com/EvgenyElizarenko/smartdns-installer/v2.10.0-stealth/smartdns-installer-v2.10.0-stealth.sh](https://raw.githubusercontent.com/EvgenyElizarenko/smartdns-installer/v2.10.0-stealth/smartdns-installer-v2.10.0-stealth.sh) -o smartdns-installer.sh
+   curl -fsSL "https://raw.githubusercontent.com/EvgenyElizarenko/smartdns-installer/refs/heads/main/smartdns-installer-v2.10.0-stealth.sh" -o smartdns-installer.sh
    chmod +x smartdns-installer.sh
    ```
 
@@ -241,7 +241,7 @@ Upon completing `--install`, the script outputs and stores three personal connec
 * **Non-Interactive Automation:**
   When invoking commands from `cron` or `systemd`, pass `SCRIPT_LANG` to skip the interactive language prompt:
   ```bash
-  sudo SCRIPT_LANG=en /home/omega/unified-smartdns-installer.sh --update </dev/null
+  sudo SCRIPT_LANG=en /<user_home_folder>/smartdns-installer.sh --update </dev/null
   ```
 
 ---
@@ -255,7 +255,9 @@ If DNS queries from a client device in Russia fail or target services remain unr
 In certain foreign hosting provider subnets, traffic may be filtered by IP address or TLS handshake signatures by TSPU (especially when using IP ranges previously utilized by mass VPN services, or when connecting with ECH enabled). Verify direct reachability of the Cover Site on port `443/TCP` from a machine in Russia bypassing system DNS:
 
 ```bash
-curl -vk --max-time 6 --resolve "example.com:443:<server_ip>" [https://example.com/](https://example.com/)
+curl -vk --max-time 6 \
+  --resolve "example.com:443:<server_ip>" \
+  "https://example.com/"
 ```
 *(Replace `example.com` with your `ROOT_DOMAIN` and `<server_ip>` with your server's public IPv4 address.)*
 
