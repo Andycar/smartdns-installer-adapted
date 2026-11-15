@@ -1,0 +1,31 @@
+name: "Предложение / Feature Request"
+description: "Предложить новую функцию или улучшение / Suggest a new feature or enhancement"
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Какую задачу решает предложение? / Problem or use case"
+      description: "Опишите сценарий использования или текущее ограничение. / Describe the use case or current limitation."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: "Предлагаемое решение / Proposed solution"
+      description: "Как именно должна работать новая функция или параметр CLI? / How should the new feature or CLI flag work?"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: compatibility
+    attributes:
+      label: "Затрагиваемые компоненты / Affected components"
+      options:
+        - label: "OxiDNS"
+        - label: "AdGuardHome"
+        - label: "Xray-core / Nginx"
+        - label: "Firewall (UFW / iptables / ipset)"
+        - label: "Локализация интерфейса (RU / EN)"

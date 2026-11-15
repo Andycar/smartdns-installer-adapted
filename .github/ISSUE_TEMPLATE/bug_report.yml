@@ -1,0 +1,96 @@
+name: "Ошибка / Bug Report"
+description: "Сообщить об ошибке в работе установщика или сервисов / Report an issue with the installer or services"
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Перед отправкой убедитесь, что вы удалили из логов свой **Cloudflare API Token**, секретный путь **DOH_PATH** и реальный домен, если не хотите публиковать его.
+        *Before submitting, make sure to redact your Cloudflare API Token, secret DOH_PATH, and private domain from logs.*
+
+  - type: textarea
+    id: description
+
+cd /c/GitHub/smartdns-installer
+git checkout main
+git pull --ff-only
+
+mkdir -p .github/ISSUE_TEMPLATE
+
+cat << 'EOF_BUG' > .github/ISSUE_TEMPLATE/bug_report.yml
+name: "Ошибка / Bug Report"
+description: "Сообщить об ошибке в работе установщика или сервисов / Report an issue with the installer or services"
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Перед отправкой убедитесь, что вы удалили из логов свой **Cloudflare API Token**, секретный путь **DOH_PATH** и реальный домен, если не хотите публиковать его.
+        *Before submitting, make sure to redact your Cloudflare API Token, secret DOH_PATH, and private domain from logs.*
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Описание проблемы / Problem description"
+      description: "Что именно пошло не так и какое поведение ожидалось? / What happened and what did you expect to happen?"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: cli_command
+    attributes:
+      label: "Используемая команда / CLI command"
+      options:
+        - "--preflight"
+        - "--install"
+        - "--test"
+        - "--switch-engine"
+        - "--update"
+        - "--sync-ip"
+        - "--change-domain"
+        - "--whitelist-*"
+        - "--rollback / --uninstall"
+        - "Другое / Other"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: dns_engine
+    attributes:
+      label: "Активный DNS-движок / Active DNS engine"
+      options:
+        - "OxiDNS (Rust)"
+        - "AdGuardHome (Go)"
+        - "Ещё не установлен / Not installed yet"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os_version
+    attributes:
+      label: "Операционная система / Operating System"
+      options:
+        - "Debian 12 (Bookworm)"
+        - "Debian 13 (Trixie)"
+        - "Ubuntu 22.04 LTS"
+        - "Ubuntu 24.04 LTS"
+        - "Другая ОС / Other OS"
+    validations:
+      required: true
+
+  - type: input
+    id: arch_version
+    attributes:
+      label: "Архитектура CPU и версия скрипта / CPU Architecture & Script Version"
+      placeholder: "например / e.g.: x86_64, v2.10.0-stealth"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Вывод --test или фрагмент журнала / Output of --test or log snippet"
+      description: "Приложите вывод команды или строки из /var/log/oxidns-installer/ (без секретов)."
+      render: shell
