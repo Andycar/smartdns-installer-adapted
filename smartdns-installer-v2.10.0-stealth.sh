@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Unified SmartDNS + Transparent SNI Proxy Production Installer (Stealth Edition)
-# File: unified-smartdns-installer.sh
+# File: smartdns-installer-v2.10.0-stealth.sh
 # Version: 2.10.0-stealth
 # Supported OS: Debian 12, Debian 13 (Trixie), Ubuntu 22.04 LTS, Ubuntu 24.04 LTS
 # ==============================================================================
