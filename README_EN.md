@@ -226,17 +226,31 @@ Upon completing `--install`, the script outputs and stores three personal connec
 
 ### 7.2. Android Authorization Workflow in DoT Whitelist
 
-The built-in **Private DNS** client in Android (9 and later) relies exclusively on **DNS-over-TLS (`853/TCP`)** and accepts only a hostname (`<DOT_HOST>`). Unlike DNS-over-HTTPS (`/resolve/<DOH_PATH>`), the DoT protocol and Android\x27s system settings provide no mechanism to pass a 48-character secret URI path.
+The built-in **Private DNS** client in Android (9 and later) relies exclusively on **DNS-over-TLS (`853/TCP`)** and accepts only a hostname (`<DOT_HOST>`). Unlike DNS-over-HTTPS (`/resolve/<DOH_PATH>`), the DoT protocol and Android's system settings provide no mechanism to pass a 48-character secret URI path.
 
 **Architectural Reasons Behind Out-of-Band Authorization:**
 * **Protection against active scanning and DoT subdomain discovery:** During a TLS 1.2/1.3 handshake on port `853/TCP`, the **SNI** extension (`<DOT_HOST>`) is transmitted in plaintext, and subdomains can also be enumerated via Certificate Transparency logs.
-* **Preventing unauthorized resolver abuse:** When `DOT_WHITELIST_ENABLED` is active, `iptables`/`ipset` drops all packets to `853/TCP` from unauthenticated IP addresses prior to the TLS handshake. Because Android\x27s native DoT client cannot present a secret token in a URL path, client authentication is decoupled into the HTTPS channel (`443/TCP`) via the secret `/auth/<DOH_PATH>` endpoint.
+* **Preventing unauthorized resolver abuse:** When `DOT_WHITELIST_ENABLED` is active, `iptables`/`ipset` drops all packets to `853/TCP` from unauthenticated IP addresses prior to the TLS handshake. Because Android's native DoT client cannot present a secret token in a URL path, client authentication is decoupled into the HTTPS channel (`443/TCP`) via the secret `/auth/<DOH_PATH>` endpoint.
 
-**Recommended Workflow on Android Devices (especially on cellular networks with dynamic IPs):**
+**Manual Workflow on Android Devices (via browser bookmark):**
 1. Bookmark your personal authorization URL (or pin it as a home-screen shortcut) in your mobile browser:
    `https://<ROOT_DOMAIN>/auth/<DOH_PATH>`
 2. Whenever you join a new Wi-Fi network or your mobile carrier assigns a new IP address, open this bookmark—Nginx validates the secret path and registers your current external IPv4/IPv6 in `ipset` for **24 hours** (`86400s`).
 3. Once the authorization confirmation appears, enable **Private DNS** (`<DOT_HOST>`) in Android settings (if it was temporarily turned off to load the page).
+
+**Automating Re-Authorization on Android (MacroDroid / Tasker without root):**
+To avoid opening the link manually every time your device switches between Wi-Fi and cellular data (where an active Private DNS blocks domain resolution before the new IP is whitelisted in `ipset`), configure a background automation rule:
+1. Grant the automation app permission to toggle Private DNS settings once from a PC via ADB:
+   ```bash
+   # For MacroDroid:
+   adb shell pm grant com.arlosoft.macrodroid android.permission.WRITE_SECURE_SETTINGS
+   # For Tasker:
+   adb shell pm grant net.dinglisch.android.taskerm android.permission.WRITE_SECURE_SETTINGS
+   ```
+2. Trigger the workflow on **Wi-Fi Connected**, **Mobile Network Changed**, and a **12-hour periodic timer** (rate-limited to at most once every 2 minutes):
+   * wait `3s` → set `Global` setting `private_dns_mode = off`;
+   * send a background HTTP `GET` request to `https://<ROOT_DOMAIN>/auth/<DOH_PATH>` (continue task on error);
+   * restore `Global` setting `private_dns_mode = hostname` (with `private_dns_specifier = <DOT_HOST>`).
 ---
 
 ## 8. Security, Backups, and Diagnostics
