@@ -1,5 +1,7 @@
 # Unified SmartDNS + Transparent SNI Proxy Installer (`v2.10.0-stealth`)
 
+**Язык / Language:** **Русский** | [English](README_EN.md)
+
 [![Version](https://img.shields.io/badge/version-v2.10.0--stealth-blue.svg)](https://github.com/EvgenyElizarenko/smartdns-installer/releases/tag/v2.10.0-stealth)
 [![OS](https://img.shields.io/badge/OS-Debian%2012%2F13%20%7C%20Ubuntu%2022.04%2F24.04-orange.svg)](#4-технические-требования)
 [![Interface](https://img.shields.io/badge/CLI-RU%20%7C%20EN-green.svg)](#51-выбор-языка-интерфейса-русский--english)
