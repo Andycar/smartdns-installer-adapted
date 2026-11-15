@@ -1121,7 +1121,8 @@ run_interactive_wizard() {
     if [[ -n "${existing_dot_wl}" ]]; then
         printf_tr "M_0053" "${existing_dot_wl}" "${existing_dot_mode}"
     fi
-    local dot_wl_prompt="$(tr_msg "M_0054")"
+    local dot_wl_prompt
+    dot_wl_prompt="$(tr_msg "M_0054")"
     read -r -p "${dot_wl_prompt}" dot_wl_choice
     if [[ -z "${dot_wl_choice}" && -n "${existing_dot_wl}" ]]; then
         read_tr "M_0055" keep_existing_wl "${existing_dot_wl}"
