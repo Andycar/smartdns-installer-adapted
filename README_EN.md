@@ -224,7 +224,7 @@ Upon completing `--install`, the script outputs and stores three personal connec
    * **Web Browsers (Chrome / Edge / Firefox):** In Privacy & Security settings, enable *Use Secure DNS* with a custom provider template set to `https://<ROOT_DOMAIN>/resolve/<DOH_PATH>`.
    * **Routers (OpenWrt / Keenetic):** Configure `https-dns-proxy` (DoH) or `stubby` / built-in DoT client pointing to `<DOT_HOST>:853`, ensuring ISP peer DNS is disabled (`peerdns = 0`).
 
-### 7.2. Android Authorization Workflow in DoT Whitelist
+### 7.2. Android Authorization Workflow in DoT Whitelist & Automation
 
 The built-in **Private DNS** client in Android (9 and later) relies exclusively on **DNS-over-TLS (`853/TCP`)** and accepts only a hostname (`<DOT_HOST>`). Unlike DNS-over-HTTPS (`/resolve/<DOH_PATH>`), the DoT protocol and Android's system settings provide no mechanism to pass a 48-character secret URI path.
 
@@ -232,25 +232,91 @@ The built-in **Private DNS** client in Android (9 and later) relies exclusively 
 * **Protection against active scanning and DoT subdomain discovery:** During a TLS 1.2/1.3 handshake on port `853/TCP`, the **SNI** extension (`<DOT_HOST>`) is transmitted in plaintext, and subdomains can also be enumerated via Certificate Transparency logs.
 * **Preventing unauthorized resolver abuse:** When `DOT_WHITELIST_ENABLED` is active, `iptables`/`ipset` drops all packets to `853/TCP` from unauthenticated IP addresses prior to the TLS handshake. Because Android's native DoT client cannot present a secret token in a URL path, client authentication is decoupled into the HTTPS channel (`443/TCP`) via the secret `/auth/<DOH_PATH>` endpoint.
 
-**Manual Workflow on Android Devices (via browser bookmark):**
-1. Bookmark your personal authorization URL (or pin it as a home-screen shortcut) in your mobile browser:
-   `https://<ROOT_DOMAIN>/auth/<DOH_PATH>`
-2. Whenever you join a new Wi-Fi network or your mobile carrier assigns a new IP address, open this bookmark—Nginx validates the secret path and registers your current external IPv4/IPv6 in `ipset` for **24 hours** (`86400s`).
-3. Once the authorization confirmation appears, enable **Private DNS** (`<DOT_HOST>`) in Android settings (if it was temporarily turned off to load the page).
+**Manual Authorization (via browser bookmark):**
+1. Bookmark your personal authorization URL (or pin it as a home-screen shortcut): `https://<ROOT_DOMAIN>/auth/<DOH_PATH>`.
+2. When joining a new Wi-Fi network or after a cellular IP change, temporarily turn off *Private DNS*, open the bookmark (Nginx registers your current IPv4/IPv6 in `ipset` for **24 hours** / `86400s`), and re-enable *Private DNS* (`<DOT_HOST>`).
 
-**Automating Re-Authorization on Android (MacroDroid / Tasker without root):**
-To avoid opening the link manually every time your device switches between Wi-Fi and cellular data (where an active Private DNS blocks domain resolution before the new IP is whitelisted in `ipset`), configure a background automation rule:
-1. Grant the automation app permission to toggle Private DNS settings once from a PC via ADB:
-   ```bash
-   # For MacroDroid:
-   adb shell pm grant com.arlosoft.macrodroid android.permission.WRITE_SECURE_SETTINGS
-   # For Tasker:
-   adb shell pm grant net.dinglisch.android.taskerm android.permission.WRITE_SECURE_SETTINGS
-   ```
-2. Trigger the workflow on **Wi-Fi Connected**, **Mobile Network Changed**, and a **12-hour periodic timer** (rate-limited to at most once every 2 minutes):
-   * wait `3s` → set `Global` setting `private_dns_mode = off`;
-   * send a background HTTP `GET` request to `https://<ROOT_DOMAIN>/auth/<DOH_PATH>` (continue task on error);
-   * restore `Global` setting `private_dns_mode = hostname` (with `private_dns_specifier = <DOT_HOST>`).
+#### Complete Android Automation Guide (MacroDroid / Tasker without root)
+
+When an Android smartphone changes its IP address (switching between Wi-Fi and cellular data, or handoffs between cell towers), a deadlock occurs: **if Private DNS is already enabled in Android settings while the new IP is not yet in `ipset` on the server, the firewall drops packets to `853/TCP`. Consequently, Android cannot resolve `<ROOT_DOMAIN>` to open the authorization link `/auth/<DOH_PATH>`.**
+
+To bypass this deadlock, an automation routine on Android must temporarily switch Private DNS to `off` (or `opportunistic`), send a background HTTP GET request to the authorization URL via the carrier/router DNS, and then restore the `hostname` mode (`<DOT_HOST>`).
+
+Below are two ready-to-use solutions using **MacroDroid** (recommended for rootless operation without complex scripting) and **Tasker** (for advanced users).
+
+##### Preparation: Granting WRITE_SECURE_SETTINGS Permission (Once via PC)
+
+Changing the *Private DNS* mode without root requires the `android.permission.WRITE_SECURE_SETTINGS` system permission, granted once from a PC over **ADB**:
+
+1. Enable **USB Debugging** inside *Developer options* on your phone and connect it to your PC.
+2. Run the corresponding command in your terminal:
+   * **For MacroDroid:**
+     ```bash
+     adb shell pm grant com.arlosoft.macrodroid android.permission.WRITE_SECURE_SETTINGS
+     ```
+   * **For Tasker:**
+     ```bash
+     adb shell pm grant net.dinglisch.android.taskerm android.permission.WRITE_SECURE_SETTINGS
+     ```
+
+##### Option 1. MacroDroid Implementation (Recommended)
+
+Create a new macro (e.g., **`SmartDNS Auto-Auth`**) with the following structure:
+
+**1. Triggers**
+Add three triggers (the macro will fire when any of them occurs):
+* **Wi-Fi Connected** (*Connectivity → Wi-Fi State → Connected to network → Any Network*).
+* **Data Connectivity Available / Mobile Network Changed** (*Connectivity → Data Connectivity Change → Data Available*).
+* **Regular Interval Timer** — every **12 hours** (since the `ipset` TTL is 24 hours, refreshing every 12 hours guarantees uninterrupted connectivity on static/long-lived IPs).
+
+**2. Actions (Step-by-Step)**
+1. **Wait before next action:** `3 seconds` — allows the Android network stack to obtain an IP address and gateway after an interface transition.
+2. **System Setting:**
+   * Table: `Global`
+   * Key: `private_dns_mode`
+   * Value: `off` *(temporarily disables Private DNS so `<ROOT_DOMAIN>` resolves via local network DNS)*.
+3. **Wait:** `1 second`.
+4. **HTTP Request:**
+   * Method: `GET`
+   * URL: `https://<ROOT_DOMAIN>/auth/<DOH_PATH>`
+   * Timeout: `10 seconds`
+   * Enable *Block next actions until complete*.
+5. **System Setting:**
+   * Table: `Global`
+   * Key: `private_dns_specifier`
+   * Value: `<DOT_HOST>`
+6. **System Setting:**
+   * Table: `Global`
+   * Key: `private_dns_mode`
+   * Value: `hostname` *(restores strict DoT Private DNS mode)*.
+
+**3. Constraints**
+To prevent infinite loops during brief signal drops:
+* **Macro not invoked recently:** `at most once every 2 minutes`.
+* **Connectivity Check:** Wi-Fi or cellular data is connected.
+
+##### Option 2. Tasker Implementation (Network State Profile)
+
+If you use **Tasker**, create a profile with the **State → Net → Network Type** context (select `WiFi`, `Mobile`, or both so the task triggers on any connection state change) and link the following `Task`:
+
+1. **Task → Wait:** `3 Seconds`
+2. **Settings → Custom Setting:**
+   * Type: `Global`
+   * Name: `private_dns_mode`
+   * Value: `off`
+3. **Net → HTTP Request:**
+   * Method: `GET`
+   * URL: `https://<ROOT_DOMAIN>/auth/<DOH_PATH>`
+   * Timeout (Seconds): `10`
+   * Enable **Continue Task After Error** (ensures Step 4 always restores Private DNS even if the request fails inside an elevator or subway).
+4. **Settings → Custom Setting:**
+   * Type: `Global`
+   * Name: `private_dns_mode`
+   * Value: `hostname`
+
+> [!NOTE]
+> Always enable continuing the task on HTTP request error (Step 3 in Tasker; enabled by default in MacroDroid). This ensures that if the phone enters an area with no internet coverage, Private DNS is never left in the disabled (`off`) state and always reverts to `hostname`.
+
 ---
 
 ## 8. Security, Backups, and Diagnostics
