@@ -156,3 +156,20 @@ run_interactive_wizard </dev/null
     print('PASS: HTTP-01 route retained; Cloudflare API flow removed')
     assert '213.21.253.61' not in source
     print('PASS: no VPS-specific hostname or IP literals in installer')
+
+    # The actual ERR trap must not turn an expected occupied-port refusal into
+    # a critical installation error. Nothing after the guard may run.
+    script = f'''source "{library}"
+check_root() {{ :; }}
+acquire_lock() {{ :; }}
+detect_environment() {{ :; }}
+validate_os_and_resources() {{ :; }}
+ss() {{ if [[ "$*" == *":443"* ]]; then echo LISTEN; fi; }}
+hostname_check() {{ echo UNEXPECTED_MUTATION >&2; exit 99; }}
+main --install
+'''
+    result = subprocess.run(['bash', '-c', script], env=dict(os.environ, SCRIPT_LANG='en'),
+                            input='', text=True, capture_output=True, timeout=5)
+    assert result.returncode == 2 and 'port 443' in result.stderr, result.stderr
+    assert 'Critical execution error' not in result.stderr and 'UNEXPECTED_MUTATION' not in result.stderr
+    print('PASS: occupied port is an expected refusal, without ERR-trap noise or mutations')

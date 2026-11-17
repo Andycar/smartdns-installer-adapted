@@ -2,6 +2,11 @@
 
 ## Unreleased — provider hostname profile / профиль имени хоста
 
+- Added `--integrate-existing`: reuse the existing Xray REALITY listener and AdGuard DoH/DoT, add managed target-domain DNS rewrites and a UNIX-socket SNI relay with secret-link IP authorization for 24 hours. Back up configurations and roll back failed activation.
+- Existing services keep their ports, REALITY client settings, routing and AdGuard TLS/filter configuration; only the fallback destination, managed rules and authorization location change. A refused stale UNIX socket can be removed after proving it has no listener.
+- Expected fresh-install port conflicts now exit with code 2 without triggering the critical ERR trap. Added TLS parser, authorization/expiry, DNS/public-address, stale-socket and refusal regression coverage.
+- Добавлен `--integrate-existing`: существующие Xray REALITY и AdGuard DoH/DoT сохраняются; добавляются правила DNS, SNI-реле и секретная авторизация IP на 24 часа. При сбое активации выполняется откат. Занятый порт при новой установке вызывает ожидаемый отказ с кодом 2 вместо критической ошибки.
+
 - Added a separate installer for external provider DNS and an existing single-host Certbot certificate; the Cloudflare installer is preserved.
 - Hostname/IP inputs come from environment variables or interactive prompts, are validated and saved for lifecycle commands and certificate renewal. No VPS-specific hostname or IP is built into the new script.
 - Added read-only hostname checks, HTTP-01 challenge routing, a lineage-specific renewal hook, shared DoT IP authorization and protection against installing over existing services.

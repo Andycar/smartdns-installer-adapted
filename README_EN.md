@@ -7,7 +7,7 @@ sudo env PROVIDER_HOSTNAME='dns.example.net' PUBLIC_IPV4='192.0.2.25' \
   SCRIPT_LANG=en ./smartdns-installer-hostname.sh --hostname-check
 ```
 
-Replace the examples with your values. `--hostname-check` is read-only. Full installation stops when an existing stack occupies required ports. Optional variables: `PUBLIC_IPV6`, `HOSTNAME_CERT_LINEAGE`, `HOSTNAME_ACME_WEBROOT`, `HOSTNAME_RENEWAL_CONF`.
+Replace the examples with your values. `--hostname-check` is read-only. Full installation stops when an existing stack occupies required ports. If Xray REALITY and AdGuard already run, use [`--integrate-existing`](HOSTNAME_SETUP.md#integrate-existing-xray-and-adguard) to reuse their listeners and encrypted DNS endpoints, with a secret 24-hour IP authorization link. Optional variables: `PUBLIC_IPV6`, `HOSTNAME_CERT_LINEAGE`, `HOSTNAME_ACME_WEBROOT`, `HOSTNAME_RENEWAL_CONF`.
 
 [![Donate — CloudTips / SBP](https://img.shields.io/badge/Donate-CloudTips_%2F_SBP-0066FF?style=for-the-badge)](https://pay.cloudtips.ru/p/9785e813)
 

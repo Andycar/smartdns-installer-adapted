@@ -990,7 +990,9 @@ run_preflight() {
     ss -tulnp 2>/dev/null | sed 's/^/  /' || true
     printf '==============================================================================\n'
     validate_os_and_resources
-    assert_fresh_install_target
+    if ! assert_fresh_install_target; then
+        exit 2
+    fi
     printf_tr "M_0031"
 }
 
@@ -5210,7 +5212,9 @@ run_uninstall() {
 run_install() {
     detect_environment
     validate_os_and_resources
-    assert_fresh_install_target
+    if ! assert_fresh_install_target; then
+        exit 2
+    fi
     hostname_check
     run_interactive_wizard
 
@@ -5260,6 +5264,7 @@ print_help() {
     printf_tr "HN_23"
     printf_tr "HN_24"
     printf_tr "HN_25"
+    printf_tr "HN_INTEGRATE_HELP"
 }
 
 main() {
@@ -5270,12 +5275,24 @@ main() {
     fi
 
     case "$1" in
-        --hostname-check|--install|--update|--sync-ip|--switch-engine|--regenerate-cover|--test)
+        --hostname-check|--integrate-existing|--install|--update|--sync-ip|--switch-engine|--regenerate-cover|--test)
             initialize_hostname_profile
             ;;
     esac
 
     case "$1" in
+        --integrate-existing)
+            ACTION_MODE="integrate-existing"
+            check_root
+            acquire_lock
+            export PROVIDER_HOSTNAME PUBLIC_IPV4
+            helper="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/smartdns-existing.py"
+            if [[ ! -f "${helper}" ]]; then
+                printf_tr "HN_INTEGRATE_MISSING" >&2
+                exit 2
+            fi
+            python3 "${helper}" --install
+            ;;
         --help|-h)
             ACTION_MODE="help"
             print_help
@@ -5466,5 +5483,10 @@ MSG_EN[HN_HOST]='Provider hostname: '
 MSG_RU[HN_HOST]='Имя хоста провайдера: '
 MSG_EN[HN_IPV4]='Public VPS IPv4: '
 MSG_RU[HN_IPV4]='Публичный IPv4 VPS: '
+
+MSG_EN[HN_INTEGRATE_HELP]='  --integrate-existing  Add SmartDNS to existing REALITY/AdGuard services\n'
+MSG_RU[HN_INTEGRATE_HELP]='  --integrate-existing  Добавить SmartDNS к существующим службам REALITY/AdGuard\n'
+MSG_EN[HN_INTEGRATE_MISSING]='Place smartdns-existing.py beside the installer before integrating.\n'
+MSG_RU[HN_INTEGRATE_MISSING]='Перед интеграцией разместите smartdns-existing.py рядом с установщиком.\n'
 
 main "$@"
