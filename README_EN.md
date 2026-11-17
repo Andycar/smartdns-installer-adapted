@@ -1,5 +1,14 @@
 # Unified SmartDNS + Transparent SNI Proxy Installer (`v2.10.0-stealth`)
 
+> **This fork: provider hostname without Cloudflare.** The new `smartdns-installer-hostname.sh` accepts `PROVIDER_HOSTNAME` and `PUBLIC_IPV4` through environment variables or interactive input. It uses an existing single-host Certbot certificate and needs no Cloudflare token. See the [hostname setup guide](HOSTNAME_SETUP.md). The original script documented below retains the Cloudflare workflow.
+
+```bash
+sudo env PROVIDER_HOSTNAME='dns.example.net' PUBLIC_IPV4='192.0.2.25' \
+  SCRIPT_LANG=en ./smartdns-installer-hostname.sh --hostname-check
+```
+
+Replace the examples with your values. `--hostname-check` is read-only. Full installation stops when an existing stack occupies required ports. Optional variables: `PUBLIC_IPV6`, `HOSTNAME_CERT_LINEAGE`, `HOSTNAME_ACME_WEBROOT`, `HOSTNAME_RENEWAL_CONF`.
+
 [![Donate — CloudTips / SBP](https://img.shields.io/badge/Donate-CloudTips_%2F_SBP-0066FF?style=for-the-badge)](https://pay.cloudtips.ru/p/9785e813)
 
 **Language:** [Русский](README.md) | **English**

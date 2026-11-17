@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — provider hostname profile / профиль имени хоста
+
+- Added a separate installer for external provider DNS and an existing single-host Certbot certificate; the Cloudflare installer is preserved.
+- Hostname/IP inputs come from environment variables or interactive prompts, are validated and saved for lifecycle commands and certificate renewal. No VPS-specific hostname or IP is built into the new script.
+- Added read-only hostname checks, HTTP-01 challenge routing, a lineage-specific renewal hook, shared DoT IP authorization and protection against installing over existing services.
+- Added bilingual hostname-profile messages, portable regression tests and an environment-variable setup guide.
+- Добавлен отдельный установщик для DNS провайдера и существующего сертификата Certbot; исходный вариант Cloudflare сохранён. Имя хоста и IP вводятся пользователем, проверяются и сохраняются. Добавлены проверка без изменений, поддержка продления HTTP-01, защита существующих служб, сообщения RU/EN и тесты.
+- Validation: Bash syntax and ShellCheck with the repository exclusions; portable tests and separate live DNS/certificate checks. Full-stack installation was not performed on the occupied VPS.
+
 Все значимые изменения проекта **Unified SmartDNS + Transparent SNI Proxy Installer** документируются в этом файле.
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/).
 
