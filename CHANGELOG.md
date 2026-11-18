@@ -2,6 +2,9 @@
 
 ## Unreleased — provider hostname profile / профиль имени хоста
 
+- Added `--integrate-existing --no-authorization` to persistently allow all client IPs for managed target domains. Rerunning integration without the flag restores the default 24-hour authorization. Existing installations update only relay policy and connection information; failed relay activation restores the previous configuration/code.
+- Добавлен флаг `--no-authorization` для режима интеграции: доступ к целевым доменам разрешается всем IP, настройка сохраняется после перезапуска. Запуск без флага возвращает авторизацию на 24 часа; перезапускается только реле.
+
 - Added `--integrate-existing`: reuse the existing Xray REALITY listener and AdGuard DoH/DoT, add managed target-domain DNS rewrites and a UNIX-socket SNI relay with secret-link IP authorization for 24 hours. Back up configurations and roll back failed activation.
 - Existing services keep their ports, REALITY client settings, routing and AdGuard TLS/filter configuration; only the fallback destination, managed rules and authorization location change. A refused stale UNIX socket can be removed after proving it has no listener.
 - Expected fresh-install port conflicts now exit with code 2 without triggering the critical ERR trap. Added TLS parser, authorization/expiry, DNS/public-address, stale-socket and refusal regression coverage.

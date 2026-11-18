@@ -29,6 +29,7 @@ CONFIG_DIR = Path('/etc/smartdns-existing')
 STATE_DIR = Path('/var/lib/smartdns-existing')
 RUNTIME_DIR = Path('/run/smartdns-existing')
 SERVICE = 'smartdns-existing.service'
+DAEMON_PATH = Path('/usr/local/libexec/smartdns-existing.py')
 XRAY_DROPIN = Path('/etc/systemd/system/xray.service.d/smartdns-existing.conf')
 BEGIN = '! BEGIN smartdns-existing managed rules'
 END = '! END smartdns-existing managed rules'
@@ -64,6 +65,12 @@ MSG_RU = {
     'SmartDNS integration stopped:': 'Интеграция SmartDNS остановлена:',
 }
 MSG_EN = {key: key for key in MSG_RU}
+MSG_RU.update({
+    'Authorization enabled (24-hour secret link).': 'Авторизация включена (секретная ссылка на 24 часа).',
+    'Authorization disabled; all client IPs can proxy the managed target domains.': 'Авторизация отключена; все клиентские IP могут проксировать управляемые целевые домены.',
+    'Existing integration hostname/IP do not match the supplied inputs.': 'Имя хоста/IP существующей интеграции не совпадают с переданными значениями.',
+})
+MSG_EN.update({key: key for key in MSG_RU})
 
 
 def tr(text):
@@ -251,11 +258,14 @@ class Runtime:
         self.config = config
         self.lock = threading.Lock()
         self.clients_file = Path(config['clients_file'])
-        self.clients = json.loads(self.clients_file.read_text()) if self.clients_file.exists() else {}
+        self.clients = (json.loads(self.clients_file.read_text())
+                        if config.get('authorization_required', True) and self.clients_file.exists() else {})
         self.domains = set(config['domains'])
         self.limit = threading.BoundedSemaphore(128)
 
     def authorized(self, address):
+        if not self.config.get('authorization_required', True):
+            return True
         with self.lock:
             return self.clients.get(address, 0) > time.time()
 
@@ -280,7 +290,7 @@ class Runtime:
 class AuthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         runtime = self.server.runtime
-        if not hmac.compare_digest(self.path, '/auth/' + runtime.config['token']):
+        if not runtime.config.get('authorization_required', True) or not hmac.compare_digest(self.path, '/auth/' + runtime.config['token']):
             self.send_error(404)
             return
         try:
@@ -467,7 +477,63 @@ def dot_request(hostname, port, question):
             return exact(encrypted, size)
 
 
-def install(hostname, public_ipv4):
+def connection_info(config):
+    host = config['hostname']
+    lines = [f"Existing DoH: https://{host}:{config['doh_port']}/dns-query",
+             f"Existing DoT: {host}:{config.get('dot_port', 853)}"]
+    if config.get('authorization_required', True):
+        lines += [f"Authorize this client IP for 24 hours: https://{host}/auth/{config['token']}",
+                  'Open the authorization URL from the same network that uses AdGuard DNS.']
+    else:
+        lines += ['Authorization disabled; all client IPs can proxy the managed target domains.']
+    lines += [f"Managed domain rules: {len(config['domains'])}",
+              f"Backup: {Path(config['backups'][0]['backup']).parent}",
+              'Rollback: python3 /usr/local/libexec/smartdns-existing.py --rollback']
+    return '\n'.join(lines) + '\n'
+
+
+def update_existing_mode(config_file, config, authorization_required):
+    daemon = DAEMON_PATH
+    info = STATE_DIR / 'connection-info.txt'
+    old_config, old_code = config_file.read_bytes(), daemon.read_bytes()
+    old_info = info.read_bytes() if info.exists() else None
+    if 'dot_port' not in config and old_info:
+        port = re.search(rb'^Existing DoT: .+:(\d+)$', old_info, re.MULTILINE)
+        if port:
+            config['dot_port'] = int(port.group(1))
+    metadata = config_file.stat()
+
+    def write_config(data):
+        staged = config_file.with_suffix('.new')
+        staged.write_bytes(data)
+        staged.chmod(metadata.st_mode & 0o777)
+        os.chown(staged, metadata.st_uid, metadata.st_gid)
+        staged.replace(config_file)
+
+    config['authorization_required'] = authorization_required
+    try:
+        if Path(__file__).resolve() != daemon.resolve():
+            shutil.copyfile(Path(__file__).resolve(), daemon)
+        write_config(json.dumps(config, indent=2).encode())
+        run('systemctl', 'restart', SERVICE)
+        if service_state(SERVICE) != 'active':
+            raise RuntimeError('Integration service is not active: ' + SERVICE)
+        info.write_text(connection_info(config))
+        info.chmod(0o600)
+    except Exception:
+        write_config(old_config)
+        daemon.write_bytes(old_code)
+        if old_info is not None:
+            info.write_bytes(old_info)
+        else:
+            info.unlink(missing_ok=True)
+        run('systemctl', 'restart', SERVICE)
+        raise
+    print(tr('Authorization enabled (24-hour secret link).' if authorization_required else
+             'Authorization disabled; all client IPs can proxy the managed target domains.'))
+
+
+def install(hostname, public_ipv4, authorization_required=True):
     import pwd
     import yaml
     if os.geteuid() != 0:
@@ -477,7 +543,10 @@ def install(hostname, public_ipv4):
     public_ipv4 = str(ipaddress.IPv4Address(public_ipv4))
     config_file = CONFIG_DIR / 'config.json'
     if config_file.exists():
-        print(tr('Integration already exists. Use --info or --rollback; do not run the fresh installer.'))
+        config = json.loads(config_file.read_text())
+        if config['hostname'] != hostname or config['public_ipv4'] != public_ipv4:
+            raise ValueError('Existing integration hostname/IP do not match the supplied inputs.')
+        update_existing_mode(config_file, config, authorization_required)
         return
     if XRAY_DROPIN.exists():
         raise ValueError('A pre-existing SmartDNS Xray drop-in requires inspection before installation')
@@ -539,7 +608,8 @@ def install(hostname, public_ipv4):
     config = {'hostname': hostname, 'public_ipv4': public_ipv4, 'original_fallback': original_fallback,
               'socket': str(RUNTIME_DIR / 'fallback.sock'), 'clients_file': str(STATE_DIR / 'clients.json'),
               'domains': domains, 'token': secrets.token_urlsafe(40), 'auth_port': 18081,
-              'backups': backups, 'nginx_was_active': service_state('nginx') == 'active', 'doh_port': doh_port}
+              'backups': backups, 'nginx_was_active': service_state('nginx') == 'active', 'doh_port': doh_port,
+              'dot_port': dot_port, 'authorization_required': authorization_required}
     daemon = Path('/usr/local/libexec/smartdns-existing.py')
     daemon.parent.mkdir(exist_ok=True, parents=True)
     shutil.copyfile(Path(__file__).resolve(), daemon)
@@ -645,7 +715,8 @@ WantedBy=multi-user.target
                 time.sleep(0.3)
         else:
             raise RuntimeError('Existing DoH endpoint failed after integration')
-        https_request(hostname, 443, '/auth/' + config['token'])
+        if authorization_required:
+            https_request(hostname, 443, '/auth/' + config['token'])
         probe_domain = next((item for item in ['chatgpt.com', 'api.openai.com', 'openai.com'] if domain_matches(item, domains)), domains[0])
         answer = https_request(hostname, doh_port, '/dns-query', dns_question(probe_domain))
         if ipaddress.IPv4Address(public_ipv4).packed not in answer:
@@ -659,12 +730,17 @@ WantedBy=multi-user.target
                 if len(answer) < 12 or answer[3] & 15 or answer[6:8] != b'\0\0':
                     raise RuntimeError('AAAA/HTTPS response suppression failed')
         # A loopback client has not authorized; its target TLS connection must fail.
-        try:
-            with socket.create_connection(('127.0.0.1', 443), timeout=5) as raw:
+        if authorization_required:
+            try:
+                with socket.create_connection(('127.0.0.1', 443), timeout=5) as raw:
+                    with ssl.create_default_context().wrap_socket(raw, server_hostname=probe_domain):
+                        raise RuntimeError('Unauthenticated target SNI was accepted')
+            except (ssl.SSLError, ConnectionError, TimeoutError):
+                pass
+        else:
+            with socket.create_connection(('127.0.0.1', 443), timeout=12) as raw:
                 with ssl.create_default_context().wrap_socket(raw, server_hostname=probe_domain):
-                    raise RuntimeError('Unauthenticated target SNI was accepted')
-        except (ssl.SSLError, ConnectionError, TimeoutError):
-            pass
+                    pass
         context = ssl.create_default_context()
         with socket.create_connection((public_ipv4, 443), timeout=12) as raw:
             with context.wrap_socket(raw, server_hostname=probe_domain):
@@ -679,16 +755,9 @@ WantedBy=multi-user.target
         config_file.unlink(missing_ok=True)
         raise
     info = STATE_DIR / 'connection-info.txt'
-    info.write_text(f'''Existing DoH: https://{hostname}:{doh_port}/dns-query
-Existing DoT: {hostname}:{tls['port_dns_over_tls']}
-Authorize this client IP for 24 hours: https://{hostname}/auth/{config['token']}
-Open the authorization URL from the same network that uses AdGuard DNS.
-Managed domain rules: {len(domains)}
-Backup: {backup_dir}
-Rollback: python3 /usr/local/libexec/smartdns-existing.py --rollback
-''')
+    info.write_text(connection_info(config))
     info.chmod(0o600)
-    print('PASS: existing DoH/DoT TLS, target rewrites, AAAA/HTTPS suppression, authorized target TLS and unauthenticated rejection')
+    print('PASS: existing DoH/DoT TLS, target rewrites, AAAA/HTTPS suppression and selected authorization policy')
     print(tr('SmartDNS integrated with the existing REALITY and AdGuard listeners.'))
     print(tr('Existing Xray clients, routing, AdGuard TLS ports and settings are preserved.'))
     print(tr('Read the private authorization URL in'), info)
@@ -702,11 +771,14 @@ def main():
     parser.add_argument('--rollback', action='store_true')
     parser.add_argument('--info', action='store_true')
     parser.add_argument('--config', default=str(CONFIG_DIR / 'config.json'))
+    parser.add_argument('--no-authorization', action='store_true', help='Allow all client IPs to proxy managed target domains; use with --install')
     args = parser.parse_args()
+    if args.no_authorization and not args.install:
+        parser.error('--no-authorization requires --install')
     if args.serve:
         serve(args.config)
     elif args.install:
-        install(os.environ['PROVIDER_HOSTNAME'], os.environ['PUBLIC_IPV4'])
+        install(os.environ['PROVIDER_HOSTNAME'], os.environ['PUBLIC_IPV4'], not args.no_authorization)
     elif args.rollback:
         if os.geteuid() != 0:
             raise ValueError('Run rollback as root')

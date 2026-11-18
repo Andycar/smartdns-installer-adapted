@@ -173,3 +173,19 @@ main --install
     assert result.returncode == 2 and 'port 443' in result.stderr, result.stderr
     assert 'Critical execution error' not in result.stderr and 'UNEXPECTED_MUTATION' not in result.stderr
     print('PASS: occupied port is an expected refusal, without ERR-trap noise or mutations')
+
+    helper = temp / 'smartdns-existing.py'
+    helper.write_text('import sys; print("HELPER_ARGS=" + " ".join(sys.argv[1:]))')
+    dispatch = f'''source "{library}"
+check_root() {{ :; }}
+acquire_lock() {{ :; }}
+'''
+    for arguments in ['--integrate-existing', '--integrate-existing --no-authorization', '--no-authorization --integrate-existing']:
+        result = subprocess.run(['bash', '-c', dispatch + 'main ' + arguments],
+                                env=dict(os.environ, SCRIPT_LANG='en'), input='', text=True, capture_output=True, timeout=5)
+        expected = 'HELPER_ARGS=--install' + (' --no-authorization' if '--no-authorization' in arguments else '')
+        assert result.returncode == 0 and expected in result.stdout, (arguments, result.stderr, result.stdout)
+    result = subprocess.run(['bash', '-c', dispatch + 'main --install --no-authorization'],
+                            env=dict(os.environ, SCRIPT_LANG='en'), input='', text=True, capture_output=True, timeout=5)
+    assert result.returncode == 2 and 'applies only to integration mode' in result.stderr, result.stderr
+    print('PASS: no-authorization flag forwarding, either argument order, default policy and invalid-mode rejection')

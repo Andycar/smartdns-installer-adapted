@@ -37,6 +37,17 @@ The helper adds a separate unprivileged UNIX-socket SNI relay, managed AdGuard r
 
 Open the private authorization URL **from the same network that uses AdGuard DNS**. Authorization lasts 24 hours and survives relay restarts until it expires. Clients using a different egress IP, such as a VPN or mobile network, must authorize that IP separately. Only requests for the managed target domains require this authorization; existing DNS endpoints and other domains retain their previous behavior.
 
+To allow every client IP to proxy the managed target domains without opening the authorization link, add `--no-authorization`:
+
+```bash
+sudo env PROVIDER_HOSTNAME='dns.example.net' PUBLIC_IPV4='192.0.2.25' \
+  SCRIPT_LANG=en ./smartdns-installer-hostname.sh --integrate-existing --no-authorization
+```
+
+The flag applies only to integration mode and may appear before or after `--integrate-existing`. The setting persists across relay restarts and reboots. Rerunning it on an existing integration changes the authorization setting and connection information and restarts only the relay. Xray, AdGuard and Nginx are not restarted or reconfigured. The managed domain allowlist and public-destination restrictions remain in force; the authorization endpoint returns 404 while authorization is disabled.
+
+To re-enable the default 24-hour authorization, rerun `--integrate-existing` without `--no-authorization`. Existing configurations without the new setting continue to require authorization. Installing support for the flag does not change the current policy until you invoke it.
+
 ```bash
 sudo cat /var/lib/smartdns-existing/connection-info.txt
 ```

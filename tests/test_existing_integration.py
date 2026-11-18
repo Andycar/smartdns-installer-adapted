@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import ipaddress
 import os
 from pathlib import Path
@@ -37,6 +38,55 @@ def hello(hostname):
 
 
 class ExistingIntegrationTests(unittest.TestCase):
+    def test_no_authorization_mode_and_connection_info(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get('SMARTDNS_TEST_TMPDIR')) as folder:
+            config = {'clients_file': str(Path(folder) / 'clients.json'), 'domains': ['example.com'],
+                      'authorization_required': False, 'hostname': 'dns.example.net', 'token': 'secret',
+                      'doh_port': 30443, 'dot_port': 8853, 'backups': [{'backup': '/backups/test/agh.yaml'}]}
+            runtime = existing.Runtime(config)
+            self.assertTrue(runtime.authorized('8.8.4.4'))
+            self.assertFalse(existing.domain_matches('unlisted.net', runtime.domains))
+            self.assertIn('Authorization disabled', existing.connection_info(config))
+            self.assertNotIn('/auth/secret', existing.connection_info(config))
+            self.assertIn(':8853', existing.connection_info(config))
+            Path(config['clients_file']).write_text('broken unused whitelist')
+            self.assertTrue(existing.Runtime(config).authorized('8.8.4.4'))
+            Path(config['clients_file']).unlink()
+            config['authorization_required'] = True
+            self.assertFalse(runtime.authorized('8.8.4.4'))
+            self.assertIn('/auth/secret', existing.connection_info(config))
+
+    def test_existing_mode_persistence_and_failed_restart_rollback(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get('SMARTDNS_TEST_TMPDIR')) as folder:
+            directory = Path(folder)
+            config_file, daemon = directory / 'config.json', directory / 'daemon.py'
+            original = {'hostname': 'dns.example.net', 'public_ipv4': '192.0.2.25', 'token': 'secret',
+                        'domains': ['example.com'], 'doh_port': 30443, 'backups': [{'backup': '/backup/agh.yaml'}]}
+            config_file.write_text(json.dumps(original))
+            daemon.write_text('old daemon')
+            info = directory / 'connection-info.txt'
+            info.write_text('old info')
+            with patch.object(existing, 'DAEMON_PATH', daemon), patch.object(existing, 'STATE_DIR', directory), \
+                 patch.object(existing, 'run') as operation, patch.object(existing, 'service_state', return_value='active'), \
+                 patch.object(existing.os, 'chown'):
+                existing.update_existing_mode(config_file, dict(original), False)
+                self.assertIs(json.loads(config_file.read_text())['authorization_required'], False)
+                self.assertEqual(json.loads(config_file.read_text())['token'], 'secret')
+                operation.assert_called_once_with('systemctl', 'restart', existing.SERVICE)
+                self.assertIn('Authorization disabled', info.read_text())
+                existing.update_existing_mode(config_file, dict(original), True)
+                self.assertIs(json.loads(config_file.read_text())['authorization_required'], True)
+                self.assertIn('/auth/secret', info.read_text())
+            previous_config, previous_code, previous_info = config_file.read_bytes(), daemon.read_bytes(), info.read_bytes()
+            with patch.object(existing, 'DAEMON_PATH', daemon), patch.object(existing, 'STATE_DIR', directory), \
+                 patch.object(existing, 'run'), patch.object(existing, 'service_state', return_value='failed'), \
+                 patch.object(existing.os, 'chown'):
+                with self.assertRaises(RuntimeError):
+                    existing.update_existing_mode(config_file, dict(original), False)
+            self.assertEqual(config_file.read_bytes(), previous_config)
+            self.assertEqual(daemon.read_bytes(), previous_code)
+            self.assertEqual(info.read_bytes(), previous_info)
+
     @unittest.skipUnless(os.name == 'posix', 'UNIX socket lifecycle requires Linux')
     def test_only_a_refused_unix_socket_is_removed(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -75,6 +125,10 @@ class ExistingIntegrationTests(unittest.TestCase):
                     self.assertEqual(response.status, 200)
                     self.assertEqual(response.headers['Cache-Control'], 'no-store')
                 self.assertTrue(runtime.authorized('8.8.4.4'))
+                runtime.config['authorization_required'] = False
+                with self.assertRaises(urllib.error.HTTPError) as error:
+                    urllib.request.urlopen(request)
+                self.assertEqual(error.exception.code, 404)
             finally:
                 server.shutdown()
                 server.server_close()

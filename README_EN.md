@@ -13,6 +13,8 @@ Replace the examples with your values. `--hostname-check` is read-only. Full ins
 
 **Language:** [Русский](README.md) | **English**
 
+Integration mode also supports `--no-authorization`, allowing all client IPs to proxy the managed target domains. Authorization remains enabled by default; rerun integration without that flag to restore 24-hour authorization. See [setup and switching modes](HOSTNAME_SETUP.md#integrate-existing-xray-and-adguard).
+
 [![Version](https://img.shields.io/badge/version-v2.10.0--stealth-blue.svg)](https://github.com/EvgenyElizarenko/smartdns-installer/releases/tag/v2.10.0-stealth)
 [![OS](https://img.shields.io/badge/OS-Debian%2012%2F13%20%7C%20Ubuntu%2022.04%2F24.04-orange.svg)](#4-technical-requirements)
 [![Interface](https://img.shields.io/badge/CLI-RU%20%7C%20EN-green.svg)](#51-interface-language-selection-russian--english)

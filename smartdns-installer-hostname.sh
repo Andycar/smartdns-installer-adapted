@@ -5265,10 +5265,25 @@ print_help() {
     printf_tr "HN_24"
     printf_tr "HN_25"
     printf_tr "HN_INTEGRATE_HELP"
+    printf_tr "HN_NO_AUTH_HELP"
 }
 
 main() {
     select_interface_language
+    local no_authorization=0 arg
+    local -a action_args=()
+    for arg in "$@"; do
+        if [[ "${arg}" == "--no-authorization" ]]; then
+            no_authorization=1
+        else
+            action_args+=("${arg}")
+        fi
+    done
+    set -- "${action_args[@]}"
+    if [[ "${no_authorization}" == 1 && "${1:-}" != "--integrate-existing" ]]; then
+        printf_tr "HN_NO_AUTH_USAGE" >&2
+        exit 2
+    fi
     if [[ $# -eq 0 ]]; then
         print_help
         exit 0
@@ -5282,6 +5297,10 @@ main() {
 
     case "$1" in
         --integrate-existing)
+            if [[ $# -ne 1 ]]; then
+                printf_tr "HN_NO_AUTH_USAGE" >&2
+                exit 2
+            fi
             ACTION_MODE="integrate-existing"
             check_root
             acquire_lock
@@ -5291,7 +5310,11 @@ main() {
                 printf_tr "HN_INTEGRATE_MISSING" >&2
                 exit 2
             fi
-            python3 "${helper}" --install
+            local -a integration_args=(--install)
+            if [[ "${no_authorization}" == 1 ]]; then
+                integration_args+=(--no-authorization)
+            fi
+            python3 "${helper}" "${integration_args[@]}"
             ;;
         --help|-h)
             ACTION_MODE="help"
@@ -5488,5 +5511,9 @@ MSG_EN[HN_INTEGRATE_HELP]='  --integrate-existing  Add SmartDNS to existing REAL
 MSG_RU[HN_INTEGRATE_HELP]='  --integrate-existing  Добавить SmartDNS к существующим службам REALITY/AdGuard\n'
 MSG_EN[HN_INTEGRATE_MISSING]='Place smartdns-existing.py beside the installer before integrating.\n'
 MSG_RU[HN_INTEGRATE_MISSING]='Перед интеграцией разместите smartdns-existing.py рядом с установщиком.\n'
+MSG_EN[HN_NO_AUTH_USAGE]='Use --integrate-existing [--no-authorization]; --no-authorization applies only to integration mode.\n'
+MSG_RU[HN_NO_AUTH_USAGE]='Используйте --integrate-existing [--no-authorization]; флаг --no-authorization доступен только в режиме интеграции.\n'
+MSG_EN[HN_NO_AUTH_HELP]='  --no-authorization   With --integrate-existing, allow all client IPs for managed target domains\n'
+MSG_RU[HN_NO_AUTH_HELP]='  --no-authorization   С --integrate-existing разрешить все клиентские IP для целевых доменов\n'
 
 main "$@"

@@ -13,6 +13,8 @@ sudo env PROVIDER_HOSTNAME='dns.example.net' PUBLIC_IPV4='192.0.2.25' \
 
 **Язык / Language:** **Русский** | [English](README_EN.md)
 
+В режиме интеграции флаг `--no-authorization` разрешает всем клиентским IP проксировать управляемые целевые домены. По умолчанию авторизация включена; повторный запуск интеграции без флага возвращает авторизацию на 24 часа. См. [настройку и переключение режимов](HOSTNAME_SETUP.md#integrate-existing-xray-and-adguard).
+
 [![Version](https://img.shields.io/badge/version-v2.10.0--stealth-blue.svg)](https://github.com/EvgenyElizarenko/smartdns-installer/releases/tag/v2.10.0-stealth)
 [![OS](https://img.shields.io/badge/OS-Debian%2012%2F13%20%7C%20Ubuntu%2022.04%2F24.04-orange.svg)](#4-технические-требования)
 [![Interface](https://img.shields.io/badge/CLI-RU%20%7C%20EN-green.svg)](#51-выбор-языка-интерфейса-русский--english)
